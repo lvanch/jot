@@ -1,0 +1,15 @@
+name = "jot-api"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+workers_dev = true
+
+# The D1 binding is declared here, not in the dashboard. Deploys from Git apply this file and
+# replace the Worker's bindings with what it lists, so a dashboard-only binding would be dropped.
+[[d1_databases]]
+binding = "DB"
+database_name = "jot"
+# >>> PASTE the D1 database ID here (dashboard → Storage & databases → D1 → jot). It is not a secret. <<<
+database_id = "PASTE-D1-DATABASE-ID-HERE"
+
+# Secret JOT_KEYS is set in the dashboard (Worker → Settings → Variables and secrets, type "Secret").
+# Secrets are not in this file and survive deploys.

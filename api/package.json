@@ -1,0 +1,11 @@
+{
+  "name": "jot-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.js",
+    "serve": "node --disable-warning=ExperimentalWarning test/serve.js",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  }
+}
