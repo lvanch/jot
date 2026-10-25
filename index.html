@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jot</title>
+  <meta name="description" content="Speak a task, it's saved. Voice-to-task capture that stays on your phone.">
+  <meta name="theme-color" content="#f5f5f3" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e0e0e" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="bar">
+    <h1 class="brand">Jot</h1>
+    <button id="share" class="share" type="button" title="Copy all / Share" aria-label="Copy all / Share open tasks" disabled>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+      <span>Share</span>
+    </button>
+  </header>
+
+  <main>
+    <section class="hero" aria-label="Capture">
+      <button id="mic" class="mic" type="button" aria-label="Start listening" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5"/></svg>
+      </button>
+      <p id="status" class="status" aria-live="polite">Tap to speak</p>
+      <p id="live" class="live" aria-live="polite"></p>
+    </section>
+
+    <section class="tasks" aria-label="Tasks">
+      <ul id="open" class="list"></ul>
+      <p id="empty" class="empty">No tasks yet. Tap the mic and say one.</p>
+      <details id="done-wrap" class="done" hidden>
+        <summary>Done <span id="done-count" class="count"></span></summary>
+        <ul id="done" class="list"></ul>
+      </details>
+    </section>
+  </main>
+
+  <button id="fab" class="fab" type="button" aria-label="Start listening" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5"/></svg>
+  </button>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+    <span id="toast-msg"></span>
+    <button id="toast-undo" class="undo" type="button">Undo</button>
+  </div>
+</body>
+</html>
