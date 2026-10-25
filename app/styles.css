@@ -103,6 +103,22 @@ svg { display: block; }
 .share:active { background: var(--line); }
 .share:disabled { opacity: 0.35; cursor: default; }
 
+/* Sync status: only shown when something's wrong */
+
+.sync {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 4px 20px 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.sync.is-error { color: var(--accent); }
+.sync[hidden] { display: none; }
+
 main {
   max-width: 560px;
   margin: 0 auto;

@@ -2,8 +2,13 @@
 
 (() => {
   const KEY = 'jot.tasks.v1';
+  const SYNC_KEY = 'jot.sync.v1'; // { api, key, cursor, uploaded }
+  const OUTBOX_KEY = 'jot.outbox.v1'; // changes not yet acknowledged by the server, oldest first
   const UNDO_MS = 5000;
   const INFO_MS = 2500;
+  const MAX_TEXT = 2000; // the sync API's limit
+  // Phones open Jot to speak; on a laptop the mic waits for a tap.
+  const AUTO_LISTEN = window.matchMedia('(pointer: coarse)').matches;
 
   const $ = (id) => document.getElementById(id);
   const micBtn = $('mic');
@@ -19,6 +24,7 @@
   const toastEl = $('toast');
   const toastMsg = $('toast-msg');
   const toastUndo = $('toast-undo');
+  const syncEl = $('sync');
 
   // ---------- Storage ----------
 
@@ -51,13 +57,17 @@
     (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 
   function clean(text) {
-    const t = String(text || '').replace(/\s+/g, ' ').trim();
+    const t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT).trimEnd();
     // Speech results often arrive lowercase; capitalise unless it looks deliberate ("iPhone").
     return /^[a-z](?![A-Z])/.test(t) ? t[0].toUpperCase() + t.slice(1) : t;
   }
 
+  // Deleted tasks stay in storage as tombstones (deletedAt set) so the deletion can sync; the UI never shows them.
+  const live = () => tasks.filter((t) => !t.deletedAt);
   const find = (id) => tasks.find((t) => t.id === id);
   const isEditing = () => !!document.querySelector('.task.editing');
+
+  // Each change is saved and shown first; queue() only records it for sync.
 
   function addTask(raw) {
     const text = clean(raw);
@@ -66,27 +76,32 @@
     tasks.push(task);
     persist();
     render(task.id);
-    toast('Saved', () => removeTask(task.id));
+    toast('Saved', () => trashTask(task.id));
+    queue({ op: 'put', id: task.id, body: { text, createdAt: task.createdAt, done: false, doneAt: null } });
     return true;
   }
 
-  function removeTask(id) {
-    const i = tasks.findIndex((t) => t.id === id);
-    if (i < 0) return null;
-    const [task] = tasks.splice(i, 1);
+  function trashTask(id) {
+    const task = find(id);
+    if (!task || task.deletedAt) return false;
+    task.deletedAt = Date.now();
     persist();
     render();
-    return task;
+    queue({ op: 'delete', id, at: task.deletedAt });
+    return true;
+  }
+
+  function restoreTask(id) {
+    const task = find(id);
+    if (!task || !task.deletedAt) return;
+    task.deletedAt = null;
+    persist();
+    render();
+    queue({ op: 'patch', id, body: { deletedAt: null } });
   }
 
   function deleteTask(id) {
-    const task = removeTask(id);
-    if (!task) return;
-    toast('Deleted', () => {
-      tasks.push(task);
-      persist();
-      render();
-    });
+    if (trashTask(id)) toast('Deleted', () => restoreTask(id));
   }
 
   function toggleTask(id) {
@@ -96,6 +111,7 @@
     task.doneAt = task.done ? Date.now() : null;
     persist();
     render();
+    queue({ op: 'patch', id, body: { done: task.done, doneAt: task.doneAt } });
   }
 
   function editTask(id, raw) {
@@ -104,16 +120,20 @@
     const text = clean(raw);
     if (!text) {
       deleteTask(id);
+      render();
       return;
     }
     if (text !== task.text) {
       task.text = text;
       persist();
+      queue({ op: 'patch', id, body: { text } });
     }
     render();
   }
 
   // ---------- Rendering ----------
+
+  let swipe = null; // the row being swiped, see below
 
   const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
   const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
@@ -168,10 +188,18 @@
     return li;
   }
 
+  let renderPending = false;
+
   function render(flashId) {
-    if (isEditing()) return; // re-rendered when the edit ends
-    const open = tasks.filter((t) => !t.done).sort((a, b) => b.createdAt - a.createdAt);
-    const done = tasks.filter((t) => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+    // Re-rendered when the edit or swipe ends.
+    if (isEditing() || (swipe && swipe.active)) {
+      renderPending = true;
+      return;
+    }
+    renderPending = false;
+    const all = live();
+    const open = all.filter((t) => !t.done).sort((a, b) => b.createdAt - a.createdAt);
+    const done = all.filter((t) => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
     openList.replaceChildren(...open.map((t) => row(t, flashId)));
     doneList.replaceChildren(...done.map((t) => row(t)));
     doneCount.textContent = '· ' + done.length;
@@ -331,6 +359,8 @@
       return;
     }
     render(); // refresh relative timestamps
+    kick(true);
+    if (!AUTO_LISTEN) return;
     clearTimeout(autoTimer);
     autoTimer = setTimeout(() => {
       if (document.visibilityState !== 'visible' || isEditing()) return;
@@ -429,8 +459,6 @@
     }, { once: true });
   }
 
-  let swipe = null;
-
   function onPointerDown(e) {
     if (e.button !== 0 || swipe) return;
     const li = e.target.closest('.task');
@@ -483,6 +511,7 @@
       setTimeout(() => {
         s.row.style.transition = '';
         s.li.classList.remove('is-swiping');
+        if (renderPending) render();
       }, 200);
     }
   }
@@ -516,7 +545,7 @@
   }
 
   shareBtn.addEventListener('click', async () => {
-    const open = tasks.filter((t) => !t.done).sort((a, b) => b.createdAt - a.createdAt);
+    const open = live().filter((t) => !t.done).sort((a, b) => b.createdAt - a.createdAt);
     if (!open.length) {
       toast('Nothing to share');
       return;
@@ -542,6 +571,304 @@
     }).observe(micBtn);
   }
 
+  // ---------- Sync ----------
+  //
+  // Optional: with no key, Jot is local-only. Once linked, every change is appended to a persisted outbox
+  // and sent in order. Pulls merge server rows into local storage and then re-apply whatever is still in
+  // the outbox, so a pull never undoes an unsent local edit. The server's rev orders everything.
+
+  const readJSON = (k) => {
+    try {
+      return JSON.parse(localStorage.getItem(k));
+    } catch {
+      return null;
+    }
+  };
+  const writeJSON = (k, v) => {
+    try {
+      localStorage.setItem(k, JSON.stringify(v));
+    } catch {
+      toast("Couldn't save — storage is full or blocked");
+    }
+  };
+
+  function loadSync() {
+    const s = readJSON(SYNC_KEY);
+    return s && typeof s.api === 'string' && typeof s.key === 'string' ? s : null;
+  }
+
+  let sync = loadSync();
+  const saveSync = () => writeJSON(SYNC_KEY, sync);
+  const outbox = () => {
+    const o = readJSON(OUTBOX_KEY);
+    return Array.isArray(o) ? o : [];
+  };
+  const saveOutbox = (o) => writeJSON(OUTBOX_KEY, o);
+
+  let problem = null; // null | 'offline' | 'rejected' | 'server'
+  let problemCode = 0;
+  let wantPull = false;
+  let running = false;
+  let rerun = false;
+  let retryTimer = 0;
+  let retryDelay = 0;
+
+  function queue(op) {
+    if (!sync) return;
+    op.seq = uid();
+    const o = outbox();
+    o.push(op);
+    saveOutbox(o);
+    showSync();
+    kick();
+  }
+
+  // The whole task as the server should store it; used for first sync and to recreate a missing row.
+  function putOp(t) {
+    const ms = (v) => (Number.isSafeInteger(v) && v >= 0 ? v : null);
+    const body = {
+      text: t.text.slice(0, MAX_TEXT),
+      createdAt: ms(t.createdAt) ?? Date.now(),
+      done: !!t.done,
+      doneAt: ms(t.doneAt),
+      deletedAt: ms(t.deletedAt),
+    };
+    if (t.fields && typeof t.fields === 'object' && !Array.isArray(t.fields)) body.fields = t.fields;
+    return { op: 'put', id: t.id, body, seq: uid() };
+  }
+
+  function showSync() {
+    let msg = '';
+    if (sync) {
+      const n = outbox().length;
+      const pending = n ? ` · ${n} not synced` : '';
+      if (problem === 'rejected') msg = 'Sync key rejected';
+      else if (problem === 'server') msg = `Sync error (${problemCode})${pending}`;
+      else if (n && (problem === 'offline' || !navigator.onLine)) msg = `Offline${pending}`;
+    }
+    syncEl.textContent = msg;
+    syncEl.classList.toggle('is-error', problem === 'rejected' || problem === 'server');
+    syncEl.hidden = !msg;
+  }
+
+  function request(method, path, body) {
+    const headers = { Authorization: 'Bearer ' + sync.key };
+    if (body) headers['Content-Type'] = 'application/json';
+    return fetch(sync.api + path, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      cache: 'no-store',
+      signal: AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined,
+    });
+  }
+
+  // Server rows replace local copies (unless older than what's held), then unsent changes go back on top.
+  function merge(rows) {
+    const pending = outbox();
+    const looks = (t) => JSON.stringify([t.text, !!t.done, t.doneAt || 0, t.createdAt, !!t.deletedAt]);
+    let changed = false;
+    for (const row of rows) {
+      if (!row || typeof row.id !== 'string' || typeof row.text !== 'string') continue;
+      const i = tasks.findIndex((t) => t.id === row.id);
+      const local = i < 0 ? null : tasks[i];
+      if (local && typeof local.rev === 'number' && row.rev < local.rev) continue;
+      const next = { ...row };
+      for (const op of pending) {
+        if (op.id !== row.id) continue;
+        if (op.op === 'patch') Object.assign(next, op.body);
+        else if (op.op === 'delete' && !next.deletedAt) next.deletedAt = op.at;
+      }
+      if (!local || looks(local) !== looks(next)) changed = true;
+      if (local) tasks[i] = next;
+      else tasks.push(next);
+    }
+    persist();
+    if (changed) render();
+  }
+
+  function fail(kind, code) {
+    problem = kind;
+    problemCode = code || 0;
+    showSync();
+    if (kind !== 'rejected') {
+      // Back off while offline or the server is failing; any new change or foregrounding tries again at once.
+      retryDelay = Math.min(retryDelay ? retryDelay * 2 : 1000, 60000);
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(kick, retryDelay * (0.75 + Math.random() / 2));
+    }
+  }
+
+  // Take op off the head of the outbox (or swap in its replacement), if it's still there.
+  function settle(op, replacement) {
+    const o = outbox();
+    if (!o.length || o[0].seq !== op.seq) return;
+    if (replacement) o[0] = replacement;
+    else o.shift();
+    saveOutbox(o);
+  }
+
+  async function step() {
+    if (!sync) return;
+    let refused = 0;
+
+    for (let o = outbox(); o.length; o = outbox()) {
+      const op = o[0];
+      const path = '/tasks/' + encodeURIComponent(op.id);
+      let res;
+      try {
+        if (op.op === 'put') res = await request('PUT', path, op.body);
+        else if (op.op === 'patch') res = await request('PATCH', path, op.body);
+        else res = await request('DELETE', path);
+      } catch {
+        return fail('offline');
+      }
+      if (res.status === 401) return fail('rejected');
+      if (res.ok) {
+        const row = await res.json().catch(() => null);
+        settle(op);
+        if (row) merge([row]);
+      } else if (res.status === 404 && op.op !== 'put') {
+        // The server never got this task: send the whole of it instead.
+        const task = find(op.id);
+        settle(op, task ? putOp(task) : null);
+      } else if (res.status >= 500 || res.status === 408 || res.status === 429) {
+        return fail('server', res.status);
+      } else {
+        // Refused for good (400/413): drop it and re-pull everything so local matches the server again.
+        settle(op);
+        refused = res.status;
+        sync.cursor = 0;
+        wantPull = true;
+      }
+    }
+
+    while (wantPull) {
+      let res;
+      try {
+        res = await request('GET', '/tasks?since=' + (sync.cursor || 0));
+      } catch {
+        return fail('offline');
+      }
+      if (res.status === 401) return fail('rejected');
+      const page = res.ok ? await res.json().catch(() => null) : null;
+      if (!page || !Array.isArray(page.tasks)) return fail('server', res.status);
+      merge(page.tasks);
+      sync.cursor = page.cursor;
+      saveSync();
+      wantPull = !!page.more;
+    }
+
+    retryDelay = 0;
+    problem = refused ? 'server' : null;
+    problemCode = refused;
+    showSync();
+  }
+
+  // One sync run at a time, across tabs too.
+  const exclusive = (fn) => (navigator.locks ? navigator.locks.request('jot-sync', fn) : fn());
+
+  // Sends the outbox (and pulls, if asked) now. A rejected key pauses sync until the next pull is asked for.
+  async function kick(pull) {
+    if (!sync || (problem === 'rejected' && !pull)) return;
+    if (pull) wantPull = true;
+    clearTimeout(retryTimer);
+    if (running) {
+      rerun = true;
+      return;
+    }
+    running = true;
+    try {
+      do {
+        rerun = false;
+        await exclusive(step);
+      } while (rerun);
+    } finally {
+      running = false;
+    }
+  }
+
+  async function verify() {
+    try {
+      const res = await request('GET', '/me');
+      if (res.status === 401) return fail('rejected');
+      const me = res.ok ? await res.json() : null;
+      if (me && !undoFn) toast(`Sync on · ${me.device}`);
+    } catch {
+      // offline: the outbox waits
+    }
+  }
+
+  function link(api, key) {
+    const same = !!sync && sync.api === api;
+    sync = { api, key, cursor: same ? sync.cursor : 0, uploaded: same && !!sync.uploaded };
+    if (!same) {
+      // revs belong to the old server
+      for (const t of tasks) delete t.rev;
+      persist();
+    }
+    if (!sync.uploaded) {
+      // First sync: send every task this device already has, once.
+      saveOutbox(tasks.map(putOp));
+      sync.uploaded = true;
+    }
+    saveSync();
+    problem = null;
+    showSync();
+    verify();
+    kick(true);
+  }
+
+  // One-time link: https://<jot>/#api=<worker-url>&key=<key>
+  function readLink() {
+    const hash = location.hash.slice(1);
+    if (!/(^|&)(api|key)=/.test(hash)) return;
+    const params = {};
+    for (const part of hash.split('&')) {
+      const i = part.indexOf('=');
+      if (i < 1) continue;
+      try {
+        params[part.slice(0, i)] = decodeURIComponent(part.slice(i + 1));
+      } catch {
+        // malformed escape: treat as missing
+      }
+    }
+    // Don't leave the key in the address bar.
+    history.replaceState(null, '', location.pathname + location.search);
+
+    let api = null;
+    try {
+      const u = new URL(params.api);
+      const local = u.hostname === 'localhost' || u.hostname === '127.0.0.1';
+      if (u.protocol === 'https:' || (local && u.protocol === 'http:')) api = (u.origin + u.pathname).replace(/\/+$/, '');
+    } catch {
+      // not a URL
+    }
+    if (!api || !params.key) {
+      toast('Sync link is incomplete');
+      return;
+    }
+    link(api, params.key);
+  }
+
+  window.addEventListener('hashchange', readLink);
+  window.addEventListener('online', () => kick(true));
+  window.addEventListener('offline', showSync);
+  window.addEventListener('focus', () => kick(true));
+
+  // Another tab changed something: pick it up.
+  window.addEventListener('storage', (e) => {
+    if (e.key === KEY) {
+      tasks = load();
+      render();
+    } else if (e.key === SYNC_KEY) {
+      sync = loadSync();
+      showSync();
+    } else if (e.key === OUTBOX_KEY) {
+      showSync();
+    }
+  });
+
   // ---------- Service worker ----------
 
   if ('serviceWorker' in navigator) {
@@ -555,6 +882,9 @@
 
   // ---------- Boot ----------
 
+  readLink();
   render();
+  showSync();
   if (document.visibilityState === 'visible') onForeground();
+  else kick(true);
 })();

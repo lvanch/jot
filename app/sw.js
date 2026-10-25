@@ -1,7 +1,7 @@
 'use strict';
 
 // Bump on every deploy so clients pick up the new shell.
-const CACHE = 'jot-v2';
+const CACHE = 'jot-v3';
 
 const SHELL = [
   './', // not 'index.html': some hosts (Cloudflare Pages) redirect it to './'
@@ -32,6 +32,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
+  // Cross-origin requests (the sync API) and writes go straight to the network.
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
 
   event.respondWith(
