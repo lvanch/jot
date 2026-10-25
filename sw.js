@@ -1,11 +1,10 @@
 'use strict';
 
 // Bump on every deploy so clients pick up the new shell.
-const CACHE = 'jot-v1';
+const CACHE = 'jot-v2';
 
 const SHELL = [
-  './',
-  'index.html',
+  './', // not 'index.html': some hosts (Cloudflare Pages) redirect it to './'
   'app.js',
   'styles.css',
   'manifest.webmanifest',
