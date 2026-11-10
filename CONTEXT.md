@@ -47,8 +47,12 @@ The shared store of Items waiting for a Processor. It belongs to no single app.
 _Avoid_: queue, task list, backlog
 
 **Item**:
-One parked Transcript, along with when, where and how it was captured.
+One parked Transcript, along with when, where and how it was captured. An Item is always in exactly one state: in the Inbox, processed, or discarded.
 _Avoid_: task, to-do, entry, note
+
+**Text**:
+An Item's current wording, which starts as its Transcript and can be corrected while the Item is in the Inbox. The Transcript itself never changes.
+_Avoid_: content, body
 
 **Park**:
 To put a Successful Capture into the Inbox as an Item. It happens the moment the Transcript arrives.
@@ -58,13 +62,21 @@ _Avoid_: save, submit, sync
 To take an Item out of the Inbox unprocessed, for example by tapping Undo right after it's parked. The Item is kept and marked as discarded.
 _Avoid_: delete
 
+**Restore**:
+To put a discarded Item back in the Inbox.
+_Avoid_: undelete, reopen
+
 **Processor**:
 An app or agent that takes Items out of the Inbox and decides what each one becomes.
 _Avoid_: consumer, client, triage app
 
 **Process**:
-What a Processor does to an Item: take it out of the Inbox and record what became of it.
+What a Processor does to an Item: take it out of the Inbox and record what became of it. It's final.
 _Avoid_: complete, done, tick
+
+**Outcome**:
+A Processor's note on what an Item became, for example "calendar event on Friday".
+_Avoid_: result, resolution
 
 ## Flagged ambiguities
 
