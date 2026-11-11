@@ -9,7 +9,7 @@ The repo already had `jot-api`, a Cloudflare Worker on D1 with per-device keys a
 
 ## Consequences
 
-- Free Supabase projects pause after 7 days without activity, which would silently break Capture. A scheduled keep-alive is required.
-- Jot's CSP (`app/_headers`) must allow the Supabase project's host instead of `*.workers.dev`.
+- Free Supabase projects pause after 7 days without activity, which would silently break Capture. A scheduled keep-alive is required (ADR-0012).
+- Jot's CSP must allow the Supabase project's host instead of `*.workers.dev`. It moves to a meta tag (ADR-0013).
 - The roughly 300 lines of outbox/sync code in `app/app.js`, plus `api/` and its tests, go away.
 - `jot-api` was never deployed, so there's no server data to move. `api/` is simply deleted.

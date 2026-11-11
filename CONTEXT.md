@@ -42,6 +42,10 @@ A Capture the Transcriber refused for good. It stays on the phone until you retr
 
 ### The Inbox
 
+**Owner**:
+The one person whose Inbox it is. Every Item belongs to the Owner, and Processors act on the Owner's behalf.
+_Avoid_: user, account
+
 **Inbox**:
 The shared store of Items waiting for a Processor. It belongs to no single app.
 _Avoid_: queue, task list, backlog
