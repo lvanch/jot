@@ -410,25 +410,28 @@ worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
 
 ## 7. v1 import (ADR-0004)
 
-**When.** On the first successful sign-in, if localStorage `jot.tasks.v1` exists and `jot.import.v1` isn't set.
+`v1import.js` (#12). It takes the storage and the Inbox client as arguments, so the whole flow is unit-tested.
 
-**Mapping.**
-- Tasks with `deletedAt` set are skipped.
+**When.** On every sign-in and every return to the foreground while signed in, if localStorage `jot.tasks.v1` exists and `jot.import.v1` isn't set. In practice that means the first successful sign-in, plus retries.
+
+**Mapping.** v1 stored `[{ id, text, createdAt, done, doneAt, deletedAt? }]`, with times in ms.
+- Tasks with `deletedAt` set are skipped, and so are tasks with no text after cleaning.
+- Text is cleaned the way v1 did: whitespace collapsed, at most 2000 characters.
 - Open tasks become `{ id, text, created_at, status: 'inbox' }`.
 - Done tasks become `{ id, text, created_at, status: 'processed', status_at: doneAt }`.
-- `created_at` and `status_at` are milliseconds since the epoch, as v1 stored them. `status_at` may be null or missing.
-- At most 5000 rows per call.
-- An id that fails the id regex gets a new UUID.
+- `created_at` and `status_at` are milliseconds since the epoch, as v1 stored them. `status_at` may be null. A missing or impossible `createdAt` falls back to `doneAt`, then to now.
+- An id that fails the id regex gets a replacement id derived from the task (`v1-` plus a 64-bit hash of its id, `createdAt` and text), not a random one. That way a retried import (for example, the answer was lost after the server saved the rows) skips the task instead of duplicating it.
+- Unreadable storage counts as an empty list.
 
 **Server side.**
-- Jot sends everything in one `import_v1_items` call.
+- Jot sends the rows in `import_v1_items` calls of at most 5000; in practice that's one call.
 - The server inserts with `source='jot-v1'`, `transcript = text`, `processed_by='jot-v1'` for done tasks, and no Recording.
 - Ids that already exist are skipped, so a repeated import is safe.
 
 **After.**
-- Set `jot.import.v1 = <ms>`.
-- Once that's 30 days old, delete `jot.tasks.v1`, `jot.sync.v1` and `jot.outbox.v1`.
-- A failed import leaves the flag unset and is tried again on the next foreground.
+- Set `jot.import.v1 = <ms>`, and show "Imported N items from Jot v1", where N counts only Items the Inbox didn't have yet. A second device with the same v1 list imports nothing new and shows no message.
+- A failed import leaves the flag unset and is tried again on the next sign-in or foreground.
+- On every launch, once the flag is 30 days old, delete `jot.tasks.v1`, `jot.sync.v1` and `jot.outbox.v1`. The flag itself stays.
 
 ## 8. Deploy, CI and operations
 
