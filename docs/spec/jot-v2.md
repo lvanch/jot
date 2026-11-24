@@ -198,38 +198,54 @@ class TranscriberRefused extends Error { status?: number }      // never retry: 
 
 ### `transcribe`
 
-`POST /functions/v1/transcribe`
+`POST /functions/v1/transcribe` (`supabase/functions/transcribe/`)
 
-**Auth.** Requires `Authorization: Bearer <user access token>`, and the caller must be the owner. The function validates the token itself with supabase-js; it doesn't rely only on the gateway's `verify_jwt`. **⚠ verify** current Supabase guidance for the new API keys.
+**Auth.** Requires `Authorization: Bearer <user access token>`, and the caller must be the Owner. Two layers, as Supabase's current guide recommends (checked 2026-11-24):
+- The platform's `verify_jwt` check stays on.
+- The function also verifies the token itself with `@supabase/server`'s `createSupabaseContext(req, { auth: 'user' })`, which checks it against the project's JWKS. It then looks the caller up in `members`.
 
 **Request.** `multipart/form-data` with these fields:
 - `id`: the Item id.
-- `captured_at`: ISO time.
-- `duration_ms`.
-- `device`.
-- `audio`: a file with MIME type `audio/webm`, `audio/ogg` or `audio/mp4`, at most 1 MB.
+- `captured_at`: ISO time, from 2020 up to a day ahead of the server clock.
+- `duration_ms`: a whole number.
+- `device`: optional, at most 64 characters.
+- `audio`: a non-empty file with MIME type `audio/webm`, `audio/ogg` or `audio/mp4` (codec parameters allowed), at most 1 MB.
 
 **Steps:**
 
-1. **Auth and role.** A bad token or a non-owner gets `401 {error:'unauthorized'}`.
-2. **Validate.** Bad fields get `400 {error:'bad_request'}`. Audio over 1 MB, or a duration over 61 s, gets `413 {error:'too_large'}`.
+1. **Auth and role.** No token, a bad token, a processor or a non-member gets `401 {error:'unauthorized'}`.
+2. **Validate.** Bad fields get `400 {error:'bad_request', message}`. Audio over 1 MB, or a duration over 61 s, gets `413 {error:'too_large', message}`.
 3. **Idempotency.** If an Item with this `id` exists, return `200 {item}` without transcribing again.
-4. **Daily cap.** If `transcription_log` has 50 or more rows for today's Perth day, return `429 {error:'daily_cap', retry_at:<next Perth midnight ISO>}`.
-5. **Store the Recording.** Upload the audio to `recordings/{id}.{ext}` (upsert).
-6. **Transcribe.** Load the Vocabulary and call `transcriber.transcribe(...)`.
-   - `TranscriberUnavailable`: log `unavailable` and return `502 {error:'transcriber_unavailable'}`.
+4. **Daily cap.** Count today's `transcription_log` rows for the Perth day, leaving out `unavailable` ones: those calls weren't billed, and counting them would let an outage use up the day. At `DAILY_CAP` (default 50) or more, return `429 {error:'daily_cap', retry_at:<next Perth midnight ISO>}`.
+5. **Store the Recording.** Upload the audio to `recordings/{id}.{ext}` (upsert), with its base MIME type.
+6. **Transcribe.** Load the Vocabulary and call `transcriber.transcribe(...)` with the MIME type as sent.
+   - `TranscriberUnavailable`: log `unavailable` and return `502 {error:'transcriber_unavailable'}`. The Recording stays; a retry overwrites it.
    - `TranscriberRefused`: log `refused`, delete the stored Recording, and return `422 {error:'transcriber_refused'}`.
 7. **Empty text** (after trimming): log `empty`, delete the stored Recording, and return `200 {item:null, empty:true}`.
-8. **Park.** Insert the Item with `transcript = text = trimmed text` and `source='jot'`, using `ON CONFLICT (id) DO NOTHING` and then a select. Log `parked` and return `201 {item}`.
+8. **Park.**
+   - Insert the Item with `transcript` = the trimmed text (at most 10000 characters), `text` = its first 2000 characters, `source='jot'`, `transcriber='<vendor>/<model>'` and the Transcriber's `meta`.
+   - Use `ON CONFLICT (id) DO NOTHING`, then log `parked`.
+   - Return `201 {item}`, or `200 {item}` if a concurrent retry parked it first.
 
-**Responses.** Every response is JSON with CORS headers allowing Jot's origin, and the function answers OPTIONS preflights.
+**Other errors.**
+- If the database or Storage fails, return `503 {error:'inbox_unavailable'}`.
+- For any other method, return `405 {error:'method_not_allowed'}`.
+- A bug returns `500 {error:'internal'}`.
+- Jot treats all three 5xx answers as "retry later".
+
+**CORS.** The function answers OPTIONS preflights itself. It sends `Access-Control-Allow-Origin` only to:
+- the origins in `JOT_ORIGINS` (default `https://lvanch.github.io`);
+- `http://localhost:*` and `http://127.0.0.1:*`, for development.
+
+**Settings.** `DAILY_CAP` and `JOT_ORIGINS` are optional environment variables. The functions use `export default { fetch }`, so they run in the edge runtime or under plain Deno (see `supabase/tests/functions/serve_local.ts`).
 
 ### `health`
 
-`GET /functions/v1/health`
+`GET /functions/v1/health` (`supabase/functions/health/`)
 - Needs no auth (`verify_jwt = false`).
-- Runs one trivial query against the database with the service role and returns `200 {ok:true}`, or `503`.
+- Runs one count query on `members` with the secret key and returns `200 {ok:true}`, or `503 {ok:false}`.
 - Exposes no data.
+- Other methods get `405`.
 
 ### Secrets
 
@@ -237,6 +253,7 @@ These are set by hand with `supabase secrets set` and never committed:
 - `ELEVENLABS_API_KEY`
 - `TRANSCRIBER` (left unset in production)
 - `ELEVENLABS_MODEL` and `ELEVENLABS_NO_VERBATIM` (optional)
+- `DAILY_CAP` and `JOT_ORIGINS` (optional; the defaults are right for production)
 
 ## 6. Jot (client)
 

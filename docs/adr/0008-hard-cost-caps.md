@@ -11,3 +11,4 @@ A small spend is fine; a runaway spend isn't. So:
 
 - A 51st Capture in one day waits until midnight Perth time (UTC+8). That's intended.
 - These limits apply at the server, so they also cover any future app that sends Recordings.
+- Calls the Transcriber couldn't take (an outage, our key or credit) aren't billed, so they don't count towards the day. Otherwise Jot's retries during an outage could use up the cap.

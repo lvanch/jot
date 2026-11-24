@@ -1,0 +1,17 @@
+{
+  "imports": {
+    "@supabase/server": "npm:@supabase/server@1.9.2",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.119.0"
+  },
+  "fmt": {
+    "lineWidth": 120
+  },
+  "lint": {
+    "rules": {
+      "tags": [
+        "recommended"
+      ]
+    }
+  },
+  "lock": false
+}
