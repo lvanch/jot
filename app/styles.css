@@ -312,15 +312,102 @@ main {
 
 .status.is-listening { color: var(--accent); }
 
-.live {
-  margin: 8px 0 0;
-  max-width: 100%;
-  min-height: 3em;
-  font-size: 1.375rem;
-  line-height: 1.35;
-  font-weight: 500;
-  overflow-wrap: anywhere;
+
+/* Recent Captures: the last 24 h from this device */
+
+.recent[hidden] { display: none; }
+
+.recent-title {
+  margin: 8px 4px 8px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
+
+.recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 60px;
+  padding: 10px 12px 10px 16px;
+}
+
+.row + .row { border-top: 1px solid var(--line); }
+
+.row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.row-text {
+  font-size: 1.0625rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  border-radius: 6px;
+  outline: none;
+}
+
+.is-inbox .row-text { cursor: text; }
+.is-inbox .row-text:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.editing .row-text {
+  padding: 2px 6px;
+  margin: -2px -6px;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  cursor: text;
+}
+
+.is-discarded .row-text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.is-processed .row-text { color: var(--muted); }
+
+.is-queued .row-text,
+.is-uploading .row-text { color: var(--muted); font-style: italic; }
+
+.is-failed .row-text { color: var(--accent); font-weight: 600; }
+
+.row-meta {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.row-actions {
+  flex: none;
+  display: flex;
+  gap: 4px;
+}
+
+.row-action {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--fg);
+  background: var(--line);
+}
+
+.row-action:active { transform: scale(0.97); }
+.throw-away { background: none; color: var(--muted); }
 
 /* Floating mic (shown when the hero mic is scrolled away) */
 

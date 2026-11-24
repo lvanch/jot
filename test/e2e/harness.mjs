@@ -244,3 +244,21 @@ export function queued(page) {
       }),
   );
 }
+
+/** Processes an Item as the seeded `claude` agent (a processor), the way a future Processor would. */
+export async function processAsClaude(id, outcome = { to: 'test' }) {
+  const key = process.env.PUBLISHABLE_KEY;
+  const auth = await fetch(`${API_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { apikey: key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'claude@jot.local', password: 'local-claude-password' }),
+  });
+  const { access_token: token } = await auth.json();
+  const res = await fetch(`${API_URL}/rest/v1/rpc/process_item`, {
+    method: 'POST',
+    headers: { apikey: key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item_id: id, outcome }),
+  });
+  if (!res.ok) throw new Error(`process_item: ${res.status} ${await res.text()}`);
+  return res.json();
+}

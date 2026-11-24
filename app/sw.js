@@ -1,7 +1,7 @@
 'use strict';
 
 // Bump on every deploy so clients pick up the new shell.
-const CACHE = 'jot-v6';
+const CACHE = 'jot-v7';
 
 const SHELL = [
   './', // not 'index.html': some hosts redirect it to './'
@@ -13,6 +13,8 @@ const SHELL = [
   'queue.js',
   'store.js',
   'uploader.js',
+  'recent.js',
+  'strip.js',
   'inbox.js',
   'signin.js',
   'auth-errors.js',

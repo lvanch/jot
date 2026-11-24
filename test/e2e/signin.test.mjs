@@ -123,6 +123,8 @@ test('the service worker precaches the whole shell', async () => {
       '/queue.js',
       '/store.js',
       '/uploader.js',
+      '/recent.js',
+      '/strip.js',
       '/inbox.js',
       '/signin.js',
       '/auth-errors.js',

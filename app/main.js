@@ -1,9 +1,10 @@
-// Jot v2: capture-only (ADR-0004). This boots the shell: sign-in, the account menu, the mic, the queue, and the
-// service worker. The recent-Captures strip (#10) plugs in here when it lands.
+// Jot v2: capture-only (ADR-0004). This boots the shell: sign-in, the account menu, the mic, the queue, the
+// recent-Captures strip, and the service worker.
 
 import { initCapture } from './capture.js';
 import { configured, createInbox, functionsUrl, SUPABASE_PUBLISHABLE_KEY } from './inbox.js';
 import { initSignIn, showSignIn } from './signin.js';
+import { initStrip } from './strip.js';
 import { $, setStatus, toast } from './ui.js';
 import { createUploader } from './uploader.js';
 
@@ -21,6 +22,8 @@ function renderStatus() {
 
 // ---------- The queue: every kept Recording goes to transcribe and becomes an Item ----------
 
+let strip = null; // the recent-Captures strip, set up below; the queue's callbacks only fire once it exists
+
 const uploader = createUploader({
   inbox,
   functionsUrl,
@@ -28,11 +31,13 @@ const uploader = createUploader({
   onStatus(text) {
     queueText = text;
     renderStatus();
+    strip?.render(); // the queue changed
   },
   onParked(item) {
     captureText = 'Tap to add another';
     renderStatus();
-    toast('Parked'); // Undo arrives with the recent-Captures strip (#10)
+    strip?.parked(item);
+    toast('Parked', () => strip?.discard(item.id)); // Undo discards it (ADR-0003)
     window.dispatchEvent(new CustomEvent('jot:parked', { detail: { id: item.id, text: item.text } }));
   },
   onEmpty() {
@@ -43,6 +48,11 @@ const uploader = createUploader({
     toast('Couldn’t transcribe that one');
   },
 });
+
+// ---------- The recent-Captures strip ----------
+
+strip = initStrip({ inbox, uploader });
+strip.render();
 
 // ---------- Signed in or not ----------
 
@@ -56,6 +66,7 @@ function render(session) {
   $('account-email').textContent = session?.user?.email ?? '';
   if (!signedIn) closeMenu();
   uploader.setSignedIn(signedIn);
+  if (signedIn) strip.refresh();
 }
 
 if (inbox) {
@@ -145,5 +156,8 @@ if ('serviceWorker' in navigator) {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   if (reloadOnResume) location.reload();
-  else uploader.kick(true);
+  else {
+    uploader.kick(true);
+    strip.refresh(); // someone may have processed or edited an Item meanwhile
+  }
 });
