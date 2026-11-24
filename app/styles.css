@@ -166,7 +166,8 @@ main {
   color: var(--muted);
 }
 
-.signin input {
+.signin input,
+.vocab input {
   width: 100%;
   min-height: 48px;
   padding: 0 14px;
@@ -178,7 +179,8 @@ main {
   font-size: 1.0625rem;
 }
 
-.signin input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.signin input:focus-visible,
+.vocab input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 #code {
   letter-spacing: 0.3em;
@@ -408,6 +410,141 @@ main {
 
 .row-action:active { transform: scale(0.97); }
 .throw-away { background: none; color: var(--muted); }
+
+/* Vocabulary: a screen of its own (vocab-screen.js sets body[data-screen]) */
+
+.vocab-open {
+  margin-top: 4px;
+  padding: 0 12px;
+}
+
+.vocab-open[hidden],
+.vocab[hidden],
+.vocab-list:empty { display: none; }
+
+body[data-screen="vocabulary"] main > :not(#vocabulary),
+body[data-screen="vocabulary"] .fab { display: none; }
+
+.vocab { padding-top: 4px; }
+
+.vocab-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 4px -12px;
+}
+
+.back {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+
+.back svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.back:active { background: var(--line); }
+
+.vocab-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.25rem;
+  outline: none;
+}
+
+.vocab-count {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.vocab .hint { margin-bottom: 12px; }
+
+.vocab-form {
+  display: flex;
+  gap: 8px;
+}
+
+.vocab-form input { flex: 1; min-width: 0; }
+.vocab-form input:disabled { opacity: 0.6; }
+.vocab-form .primary { margin-top: 0; padding: 0 20px; }
+
+.vocab-note {
+  margin: 16px 4px 0;
+  color: var(--muted);
+}
+
+.vocab-note:empty { display: none; }
+
+.vocab-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.vocab-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 2px 4px 2px 16px;
+  transition: background-color 0.6s;
+}
+
+.vocab-row + .vocab-row { border-top: 1px solid var(--line); }
+.vocab-row.is-new { background: var(--accent-soft); transition: none; }
+
+.vocab-term {
+  flex: 1;
+  min-width: 0;
+  font-size: 1.0625rem;
+  overflow-wrap: anywhere;
+}
+
+.vocab-delete {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.vocab-delete svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.vocab-delete:active { background: var(--line); }
+.vocab-delete:disabled { opacity: 0.4; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 
 /* Floating mic (shown when the hero mic is scrolled away) */
 

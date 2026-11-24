@@ -225,6 +225,20 @@ export async function removeItems(ids) {
   await rest(`/rest/v1/transcription_log?item_id=${inList(ids)}`, { method: 'DELETE' });
 }
 
+/** The Vocabulary's terms, oldest first. */
+export const vocabularyTerms = async () => (await rest('/rest/v1/vocabulary?select=term&order=id')).map((r) => r.term);
+
+/** Replaces the whole Vocabulary. */
+export async function setVocabulary(terms) {
+  await rest('/rest/v1/vocabulary?id=gt.0', { method: 'DELETE' });
+  await addVocabulary(terms);
+}
+
+/** Adds terms behind Jot's back, as another device would. */
+export async function addVocabulary(terms) {
+  if (terms.length) await rest('/rest/v1/vocabulary', { method: 'POST', body: JSON.stringify(terms.map((term) => ({ term }))) });
+}
+
 /** What Jot holds in IndexedDB, without the Recordings. */
 export function queued(page) {
   return page.evaluate(

@@ -284,9 +284,16 @@ The modules that hold logic stay pure and get unit tests:
 - **Capture** (the main screen), from top to bottom:
   - the mic button, plus the floating mic as in v1;
   - the status line;
-  - a Vocabulary button;
+  - a Vocabulary button, shown only when signed in;
   - the recent-Captures strip.
-- **Vocabulary.** A list of terms with delete buttons, an add field (trimmed, 1–50 characters, duplicates checked case-insensitively), and an `n/100` count. It writes straight to the `vocabulary` table.
+- **Vocabulary** (#11; `vocab-screen.js`, with the rules in `vocabulary.js`, a pure module with tests). A screen of its own in place of the mic, with a back button. Opening it pushes a history entry, so Android's back gesture (or Escape) returns to the mic, and a reload stays on it.
+  - **The list:** every term A–Z, ignoring case, each with a remove button, and an `n/100` count. It's read from the `vocabulary` table each time the screen opens.
+  - **Adding:** one field and an Add button (Enter works too). The term is trimmed and inner spaces collapsed, then checked before any request: 1–50 characters, at most 5 words, none of `< > { } [ ] \`, not already there in any case ("“Ngaio” is already in your Vocabulary."). The field clears for the next term.
+  - **The cap:** at 100 the field and Add button are off, with "Full: remove a term to add another". The database enforces the cap and uniqueness too; when it refuses (another device got there first), the screen shows why and re-reads the list.
+  - **Removing:** immediate, with "Removed “X” · Undo", which adds it back.
+  - **The mic:** opening the screen stops a Recording in progress, keeping it only if speech was heard, and Jot doesn't auto-listen while the screen is up.
+  - Signing out closes the screen. Reads and writes go straight to the table through supabase-js, under RLS (Owner only).
+  - Not in v2: offering "Add to Vocabulary?" after a correction (ADR-0007).
 
 ### Recording (ADR-0003)
 

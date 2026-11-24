@@ -13,9 +13,10 @@ export const DEVICE = AUTO_LISTEN ? 'phone' : 'desktop';
 /**
  * @typedef {{ id: string, blob: Blob, mimeType: string, capturedAt: number, durationMs: number, device: string,
  *   stop: string }} Capture
- * @param {{ onCapture: (capture: Capture) => void, onStatus?: (text: string, listening: boolean) => void }} options
+ * @param {{ onCapture: (capture: Capture) => void, onStatus?: (text: string, listening: boolean) => void,
+ *   canAutoListen?: () => boolean }} options `canAutoListen` says no while another screen is up
  */
-export function initCapture({ onCapture, onStatus = setStatus }) {
+export function initCapture({ onCapture, onStatus = setStatus, canAutoListen = () => true }) {
   const micBtn = $('mic');
   const fabBtn = $('fab');
   let session = null; // the Recording in progress: { handle, auto }
@@ -94,6 +95,7 @@ export function initCapture({ onCapture, onStatus = setStatus }) {
     autoTimer = setTimeout(() => {
       if (document.visibilityState !== 'visible') return;
       if (document.activeElement?.matches('input, textarea, [contenteditable="true"]')) return; // typing a code
+      if (!canAutoListen()) return;
       window.scrollTo(0, 0);
       start(true);
     }, 150);
@@ -113,5 +115,11 @@ export function initCapture({ onCapture, onStatus = setStatus }) {
   onStatus('Tap to speak', false);
   if (document.visibilityState === 'visible') onForeground();
 
-  return { start, onForeground };
+  /** Leaving the mic for another screen: stop, keeping the Recording only if speech was heard. */
+  function leave() {
+    clearTimeout(autoTimer);
+    session?.handle.stop('hidden');
+  }
+
+  return { start, onForeground, leave };
 }

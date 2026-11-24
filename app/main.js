@@ -7,6 +7,7 @@ import { initSignIn, showSignIn } from './signin.js';
 import { initStrip } from './strip.js';
 import { $, setStatus, toast } from './ui.js';
 import { createUploader } from './uploader.js';
+import { initVocabulary } from './vocab-screen.js';
 
 const inbox = configured ? createInbox() : null;
 
@@ -54,6 +55,11 @@ const uploader = createUploader({
 strip = initStrip({ inbox, uploader });
 strip.render();
 
+// ---------- Vocabulary: its own screen; the mic stops listening while it's up ----------
+
+let mic = null; // the mic, set up below
+const vocab = initVocabulary({ inbox, onOpen: () => mic?.leave() });
+
 // ---------- Signed in or not ----------
 
 const accountBtn = $('account');
@@ -66,6 +72,7 @@ function render(session) {
   $('account-email').textContent = session?.user?.email ?? '';
   if (!signedIn) closeMenu();
   uploader.setSignedIn(signedIn);
+  vocab.setSignedIn(signedIn);
   if (signedIn) strip.refresh();
 }
 
@@ -115,7 +122,8 @@ $('sign-out').addEventListener('click', async () => {
 const micBtn = $('mic');
 const fabBtn = $('fab');
 
-initCapture({
+mic = initCapture({
+  canAutoListen: () => !vocab.isOpen(),
   onStatus(text, isListening) {
     captureText = text;
     listening = isListening;
