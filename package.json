@@ -1,0 +1,13 @@
+{
+  "name": "jot",
+  "private": true,
+  "type": "module",
+  "description": "Jot: voice capture into a shared Inbox. The app is static (app/); this file only drives its tests.",
+  "scripts": {
+    "test:unit": "node --test \"test/unit/*.test.mjs\"",
+    "test:e2e": "node --test --test-concurrency=1 \"test/e2e/*.test.mjs\""
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

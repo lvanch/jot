@@ -2,7 +2,7 @@
   "id": "./",
   "name": "Jot",
   "short_name": "Jot",
-  "description": "Speak a task, it's saved. Voice-to-task capture that stays on your phone.",
+  "description": "Say it, it's in your Inbox. One-tap voice capture for your to-do Inbox.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
