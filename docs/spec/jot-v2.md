@@ -360,22 +360,32 @@ Three modules handle this:
 
 ### Recent-Captures strip
 
+Two modules handle this: `recent.js` (pure, unit-tested) and `strip.js` (the UI).
+
 **Contents.**
-- Up to 10 Captures from this device in the last 24 h, newest first.
-- That covers queued and failed Captures (from IndexedDB) and parked Items (cached in localStorage `jot.recent.v2` as `{id, text, status}`).
-- On foreground, Jot refreshes the cached Items' `text` and `status` from `items`.
+- Up to 10 Captures from this device in the last 24 h, newest first, under a "Recent" heading. The strip is hidden when it's empty.
+- Queued and failed Captures come from IndexedDB.
+- Parked Items come from a cache in localStorage, `jot.recent.v2`, as `{id, text, status, at}`. A Capture that just parked shows once, as its Item.
+- Jot refreshes the cached Items' `text` and `status` from `items` on boot, on sign-in and on foreground.
 
 **Row actions.**
 
 | Row | Shows | Actions |
 |---|---|---|
-| Item in the Inbox | Text | Tap to edit, which calls `edit_item_text`. Undo (5 s toast) calls `discard_item`. |
-| Discarded Item | Struck-through Text | Restore, which calls `restore_item` |
-| Processed Item | Text, read-only | None; tapping shows "Already processed" |
-| Queued Capture | "Transcribing…" or "Queued" | None |
-| Failed Capture | "Couldn't transcribe" | Retry, Throw away |
+| Item in the Inbox | Text, time | Tap the Text to edit it in place: Enter or blur saves through `edit_item_text`, Escape cancels, and blank Text is refused. The 5 s "Parked · Undo" toast calls `discard_item`. |
+| Discarded Item | Struck-through Text, "Discarded" | Restore, which calls `restore_item` |
+| Processed Item | Muted Text, "Processed" | None; tapping shows "Already processed" |
+| Queued Capture | "Queued" or "Transcribing…" | None |
+| Failed Capture | "Couldn't transcribe" | Retry (back in the queue, sent now). Throw away needs a second tap ("Sure?") within 3 s, then deletes the Recording from the phone. |
 
-**Removed:** the v1 list, Done section, tick, swipe-to-delete, Copy all and Share.
+**When an action fails** (`actionErrorMessage()`), the Item isn't changed:
+- Offline, or a failed request → "Needs a connection". Nothing is queued.
+- `wrong_state` → "Already processed", and the row refreshes.
+- `not_found` → "That one's gone from the Inbox".
+- `invalid_text` → "Text can't be empty".
+- `not_allowed` → "Sign in first".
+
+**Removed:** the v1 list, Done section, tick, swipe-to-delete, Copy all and Share. So is v1's live-transcript line under the mic, since v2 shows no text while you speak.
 
 ### Hosting and offline
 

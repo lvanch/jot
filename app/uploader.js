@@ -195,11 +195,25 @@ export function createUploader({ inbox, functionsUrl, publishableKey, onParked, 
     return kick(true);
   }
 
+  /** Puts a failed Capture back in the queue and sends it now. */
+  async function retry(id) {
+    const record = await getCapture(id);
+    if (!record) return;
+    await putCapture({ ...record, state: 'queued', attempts: 0, lastError: null, nextAttemptAt: 0 });
+    return kick(true);
+  }
+
+  /** Deletes a Capture and its Recording from the phone. */
+  async function throwAway(id) {
+    await deleteCapture(id);
+    return report();
+  }
+
   function setSignedIn(on) {
     state.signedIn = on;
     if (on) kick(true);
     else report();
   }
 
-  return { add, kick, resume, setSignedIn };
+  return { add, kick, resume, retry, throwAway, setSignedIn };
 }
