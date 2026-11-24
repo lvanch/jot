@@ -279,6 +279,9 @@ main {
   color: #fff;
 }
 
+/* The halo grows with the voice (capture.js sets --level, 0 to 1). */
+.mic.is-listening { box-shadow: 0 0 0 calc(var(--level, 0) * 22px) var(--accent-soft); transition: box-shadow 0.08s linear; }
+
 .mic.is-listening::before,
 .mic.is-listening::after {
   content: "";

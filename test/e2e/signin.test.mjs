@@ -113,7 +113,22 @@ test('the service worker precaches the whole shell', async () => {
       const cache = await caches.open(keys.find((k) => k.startsWith('jot-')));
       return (await cache.keys()).map((r) => new URL(r.url).pathname);
     });
-    for (const path of ['/', '/main.js', '/inbox.js', '/signin.js', '/auth-errors.js', '/ui.js', '/config.js', '/vendor/supabase.js', '/styles.css']) {
+    const shell = [
+      '/',
+      '/main.js',
+      '/capture.js',
+      '/recorder.js',
+      '/silence.js',
+      '/mic-errors.js',
+      '/inbox.js',
+      '/signin.js',
+      '/auth-errors.js',
+      '/ui.js',
+      '/config.js',
+      '/vendor/supabase.js',
+      '/styles.css',
+    ];
+    for (const path of shell) {
       assert.ok(cached.includes(path), `${path} is precached`);
     }
   });
