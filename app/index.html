@@ -54,11 +54,32 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5"/></svg>
       </button>
       <p id="status" class="status" aria-live="polite">Tap to speak</p>
+      <button id="vocab-open" class="link vocab-open" type="button" hidden>Vocabulary</button>
     </section>
 
     <section id="recent" class="recent" aria-labelledby="recent-title" hidden>
       <h2 id="recent-title" class="recent-title">Recent</h2>
       <ul id="recent-list" class="recent-list"></ul>
+    </section>
+
+    <section id="vocabulary" class="vocab" aria-labelledby="vocab-title" hidden>
+      <div class="vocab-head">
+        <button id="vocab-back" class="back" type="button" aria-label="Back to the mic">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <h2 id="vocab-title" tabindex="-1">Vocabulary</h2>
+        <span id="vocab-count" class="vocab-count" aria-live="polite"></span>
+      </div>
+      <p class="hint">Names and words Jot should spell your way. Sent with every Capture.</p>
+      <form id="vocab-form" class="vocab-form" novalidate>
+        <label for="vocab-term" class="sr-only">New term</label>
+        <input id="vocab-term" name="term" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="Add a name or word">
+        <button id="vocab-add" class="primary" type="submit">Add</button>
+      </form>
+      <p id="vocab-error" class="error" role="alert"></p>
+      <p id="vocab-note" class="vocab-note"></p>
+      <button id="vocab-retry" class="link" type="button" hidden>Try again</button>
+      <ul id="vocab-list" class="vocab-list"></ul>
     </section>
   </main>
 
