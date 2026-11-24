@@ -264,11 +264,23 @@ The modules that hold logic stay pure and get unit tests:
 - `queue.js`: retry and backoff.
 - `v1import.js`: the v1-to-Item mapping.
 
-**Config.** `app/config.js` holds `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. Neither is a secret.
+**Config.** `app/config.js` holds `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. Neither is a secret. Until they're set (#2), they're placeholders, and the sign-in card says "Jot isn't connected to its Inbox yet."
+
+**supabase-js** is the 2.119.0 UMD build in `app/vendor/supabase.js`. It's loaded as a classic script that defines `window.supabase`; see `app/vendor/README.md`. The session lives in localStorage under `jot.auth.v2`, so it never collides with v1's `jot.*` keys.
 
 ### Screens
 
-- **Sign-in.** It's shown when there's no session. The user enters an email, which triggers `signInWithOtp({ email, options: { shouldCreateUser: false } })`, then types the 6-digit code, which calls `verifyOtp({ type: 'email' })`. Captures made before sign-in still record and queue.
+- **Sign-in.** A card above the mic, shown whenever there's no session. The mic stays usable, and Captures made before sign-in still record and queue (#9).
+  - **Step 1:** enter an email. That calls `signInWithOtp({ email, options: { shouldCreateUser: false } })`. A malformed address is caught before any request.
+  - **Step 2:** type the code. That calls `verifyOtp({ email, token, type: 'email' })`. Codes are 6–10 digits, depending on the project's setting.
+  - **Error messages:** set by `auth-errors.js`, a pure module with tests:
+    - unknown email (`otp_disabled`, since sign-ups are off) → "That email isn't set up for Jot.";
+    - wrong or expired code → "That code is wrong or has expired…";
+    - rate limits → "Too many tries…";
+    - offline → "No connection…".
+  - The card also offers "Send a new code" and "Use a different email". The last email used is remembered (`jot.email.v2`).
+  - **Email template:** `supabase/templates/magic_link.html` shows `{{ .Token }}`, wired up in `config.toml`. The hosted project needs the same template; that's part of owner setup.
+- **Account menu.** A "⋯" button in the header, visible only when signed in, shows the email and **Sign out**. Sign-out uses `scope: 'local'`, so other devices stay signed in.
 - **Capture** (the main screen), from top to bottom:
   - the mic button, plus the floating mic as in v1;
   - the status line;

@@ -1,11 +1,17 @@
 'use strict';
 
 // Bump on every deploy so clients pick up the new shell.
-const CACHE = 'jot-v3';
+const CACHE = 'jot-v4';
 
 const SHELL = [
-  './', // not 'index.html': some hosts (Cloudflare Pages) redirect it to './'
-  'app.js',
+  './', // not 'index.html': some hosts redirect it to './'
+  'main.js',
+  'inbox.js',
+  'signin.js',
+  'auth-errors.js',
+  'ui.js',
+  'config.js',
+  'vendor/supabase.js',
   'styles.css',
   'manifest.webmanifest',
   'icons/icon-192.png',
@@ -32,7 +38,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  // Cross-origin requests (the sync API) and writes go straight to the network.
+  // Cross-origin requests (Supabase: auth, the Inbox, transcribe) and writes always go to the network.
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
 
   event.respondWith(
