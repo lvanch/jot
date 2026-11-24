@@ -158,24 +158,36 @@ Every transition sets `status_at = now()`.
 interface TranscribeInput { audio: Blob; mimeType: string; vocabulary: string[]; language: 'en' }
 interface TranscribeResult { text: string; language: string | null; model: string; meta: Record<string, unknown> }
 interface Transcriber { name: string; transcribe(input: TranscribeInput): Promise<TranscribeResult> }
-class TranscriberUnavailable extends Error {}  // network errors, timeouts, 5xx, 429 → retryable
-class TranscriberRefused extends Error {}      // 4xx because of the audio itself → permanent
+class TranscriberUnavailable extends Error { status?: number }  // retry later: network, timeout, 429, 5xx, or our key/credit (401/402/403)
+class TranscriberRefused extends Error { status?: number }      // never retry: the vendor rejected the Recording itself (400/413/415/422)
 ```
 
 - Adapters: `elevenlabs.ts` and `fake.ts`.
 - `getTranscriber()` picks one from the env var `TRANSCRIBER`, defaulting to `elevenlabs`.
-- `fake` returns deterministic text (`'fake transcript <bytes>'`, or `''` when the audio is under 1 KB) and refuses to load unless `ALLOW_FAKE_TRANSCRIBER=1`. It's for tests only.
+- `fake` refuses to load unless `ALLOW_FAKE_TRANSCRIBER=1`; it's for tests only. Its output depends on the Recording's bytes:
+  - under 1 KB → `''`;
+  - starting with `FAKE:REFUSE` → Refused (422);
+  - starting with `FAKE:UNAVAILABLE` → Unavailable (503);
+  - anything else → `'fake transcript <bytes>'`.
+  - `meta.vocabulary` echoes the terms it received.
 
-**ElevenLabs adapter**
-- Request: `POST https://api.elevenlabs.io/v1/speech-to-text`, header `xi-api-key: $ELEVENLABS_API_KEY`, multipart body. **⚠ verify** the auth header name.
+**ElevenLabs adapter** (checked against the API reference and live calls on 2026-11-24; see ADR-0001)
+- Request: `POST https://api.elevenlabs.io/v1/speech-to-text`, header `xi-api-key`, multipart body.
 - Fields:
-  - `model_id=scribe_v2`
-  - `file`
-  - `language_code=en`: **⚠ verify** whether it takes `en` or `eng`.
-  - `keyterms`: only when the Vocabulary isn't empty. **⚠ verify** how the array is encoded in multipart, the term limit (100 or 1000), and the per-term length limit.
+  - `model_id`: `ELEVENLABS_MODEL`, default `scribe_v2`.
+  - `file`: named `recording.<ext>` to match the MIME type.
+  - `language_code=en`. ISO-639-1 is accepted; the response reports `eng`.
+  - `keyterms`: one repeated field per term, as the official SDK sends them, and omitted when the Vocabulary is empty. Terms ElevenLabs would reject are dropped first:
+    - longer than 50 characters;
+    - more than 5 words;
+    - containing `< > { } [ ] \`;
+    - duplicates (ignoring case);
+    - anything past 100 terms.
   - `tag_audio_events=false`, so tags like "(laughs)" don't land in the text.
-  - `diarize=false`
-- Text: use the response's `text`. Put the language and its probability into `meta`. **⚠ verify** the response shape.
+  - `diarize=false`, `timestamps_granularity=none`.
+  - `no_verbatim=true` only when `ELEVENLABS_NO_VERBATIM=1`.
+- Response: `text`, `language_code`, `language_probability`, `audio_duration_secs`, `transcription_id`. The last three go into `meta`, along with the number of key terms sent.
+- Observed: corrupt audio gives `400 invalid_audio` (Refused). Silence and clips under 100 ms give `200` with empty text.
 - Timeout: 30 s.
 - Never log the audio, the text or the key.
 
@@ -219,6 +231,7 @@ class TranscriberRefused extends Error {}      // 4xx because of the audio itsel
 These are set by hand with `supabase secrets set` and never committed:
 - `ELEVENLABS_API_KEY`
 - `TRANSCRIBER` (left unset in production)
+- `ELEVENLABS_MODEL` and `ELEVENLABS_NO_VERBATIM` (optional)
 
 ## 6. Jot (client)
 
