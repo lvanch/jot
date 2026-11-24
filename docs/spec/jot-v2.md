@@ -64,7 +64,7 @@ Membership decides who may do what (ADR-0005, ADR-0011).
 |---|---|---|
 | `user_id` | uuid PK → `auth.users` | |
 | `role` | text | `'owner'` or `'processor'` |
-| `name` | text, unique | Shown as `processed_by`, e.g. `owner` or `claude` |
+| `name` | text, unique | Shown as `processed_by`, e.g. `owner` or `claude`. Must match `^[a-z0-9][a-z0-9_-]{0,31}$`; `jot-v1` is reserved. |
 
 - At most one `owner` row: enforce it with a partial unique index.
 - Helper functions, all `SECURITY DEFINER` and `STABLE`, with `search_path` set:
@@ -77,7 +77,7 @@ Membership decides who may do what (ADR-0005, ADR-0011).
 | column | type | notes |
 |---|---|---|
 | `id` | text PK | Chosen by Jot for each Capture (a UUID). Must match `^[A-Za-z0-9_-]{1,64}$`; v1 ids pass too. |
-| `transcript` | text not null | Never updated. A trigger blocks changes. |
+| `transcript` | text not null | At most 10000 characters. Never updated: a trigger blocks changes to `id`, `transcript`, `captured_at`, `parked_at` and `source`. |
 | `text` | text not null | 1–2000 characters, not blank. Starts equal to `transcript`. |
 | `captured_at` | timestamptz not null | Phone clock |
 | `parked_at` | timestamptz not null default now() | Server clock |
@@ -116,7 +116,7 @@ One row per call to the Transcriber. This drives the daily cap and gives cost vi
 
 ### Storage
 
-- A private bucket `recordings`, with objects at `{item_id}.{ext}`.
+- A private bucket `recordings`, with objects at `{item_id}.{ext}`. The bucket itself caps files at 1 MB and accepts only `audio/webm`, `audio/ogg` and `audio/mp4`.
 - Only server functions write to it.
 - Members may read it (for example through signed URLs).
 
@@ -137,7 +137,12 @@ These are callable from any client through `supabase.rpc(...)` and are the only 
 
 - Each runs as `SECURITY DEFINER` and checks the caller's role first.
 - Each returns the updated Item row.
-- **Errors:** each raises a Postgres exception with a stable code in its message: `not_allowed`, `not_found`, `wrong_state`, `invalid_text`.
+- **Errors:** each raises a Postgres exception whose message is a stable code. The SQLSTATE picks the REST status:
+  - `not_allowed`: `42501` (403)
+  - `not_found`: `P0002` (404)
+  - `wrong_state`: `P0001` (400)
+  - `invalid_text`: `22023` (400)
+  - `invalid_rows`: `22023` (400; `import_v1_items` only)
 - **Repeats:** calling again when the Item is already in the target state returns it unchanged.
 
 | function | who | transition |
@@ -331,6 +336,8 @@ worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
 - Tasks with `deletedAt` set are skipped.
 - Open tasks become `{ id, text, created_at, status: 'inbox' }`.
 - Done tasks become `{ id, text, created_at, status: 'processed', status_at: doneAt }`.
+- `created_at` and `status_at` are milliseconds since the epoch, as v1 stored them. `status_at` may be null or missing.
+- At most 5000 rows per call.
 - An id that fails the id regex gets a new UUID.
 
 **Server side.**
