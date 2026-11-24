@@ -9,7 +9,7 @@ Values marked **⚠ verify** are unconfirmed, because the vendors' docs were unr
 **In**
 - Jot v2: capture-only PWA (ADR-0004).
 - Supabase backend in Sydney: schema, row-level security (RLS), lifecycle functions, the `transcribe` and `health` functions, and a Recordings bucket.
-- Transcriber seam with an ElevenLabs Scribe v2 adapter.
+- Transcriber seam with an ElevenLabs Scribe v3 adapter.
 - One-time import of the v1 list.
 - Deploys through GitHub Actions; CSP in a meta tag.
 - Keep-alive.
@@ -35,7 +35,7 @@ Jot (lvanch.github.io/jot, GitHub Pages)
   ├─ supabase-js (vendored) ── Auth: email code sign-in, session in localStorage
   ├─ IndexedDB: Recordings of Queued and Failed Captures
   └─ HTTPS ─► Supabase project (ap-southeast-2, Free plan)
-               ├─ Edge Function transcribe ─► Transcriber seam ─► ElevenLabs Scribe v2
+               ├─ Edge Function transcribe ─► Transcriber seam ─► ElevenLabs Scribe v3
                ├─ Edge Function health   ◄── cron-job.org every 2 days
                ├─ Postgres: members, items, vocabulary, transcription_log + lifecycle functions
                └─ Storage: private bucket "recordings"
@@ -87,7 +87,7 @@ Membership decides who may do what (ADR-0005, ADR-0011).
 | `outcome` | jsonb null | Free-form note from the Processor, set when the Item is processed |
 | `source` | text not null | `'jot'` or `'jot-v1'` |
 | `device` | text null | e.g. `phone` |
-| `transcriber` | text null | e.g. `elevenlabs/scribe_v2` |
+| `transcriber` | text null | e.g. `elevenlabs/scribe_v3` |
 | `language` | text null | |
 | `duration_ms` | int null | |
 | `recording_path` | text null | Path in the `recordings` bucket |
@@ -174,7 +174,7 @@ class TranscriberRefused extends Error { status?: number }      // never retry: 
 **ElevenLabs adapter** (checked against the API reference and live calls on 2026-11-24; see ADR-0001)
 - Request: `POST https://api.elevenlabs.io/v1/speech-to-text`, header `xi-api-key`, multipart body.
 - Fields:
-  - `model_id`: `ELEVENLABS_MODEL`, default `scribe_v2`.
+  - `model_id`: `ELEVENLABS_MODEL`, default `scribe_v3`.
   - `file`: named `recording.<ext>` to match the MIME type.
   - `language_code=en`. ISO-639-1 is accepted; the response reports `eng`.
   - `keyterms`: one repeated field per term, as the official SDK sends them, and omitted when the Vocabulary is empty. Terms ElevenLabs would reject are dropped first:
@@ -185,7 +185,7 @@ class TranscriberRefused extends Error { status?: number }      // never retry: 
     - anything past 100 terms.
   - `tag_audio_events=false`, so tags like "(laughs)" don't land in the text.
   - `diarize=false`, `timestamps_granularity=none`.
-  - `no_verbatim=true` only when `ELEVENLABS_NO_VERBATIM=1`.
+  - `no_verbatim=true`, so "um", "uh" and false starts are dropped. `ELEVENLABS_NO_VERBATIM=0` turns this off.
 - Response: `text`, `language_code`, `language_probability`, `audio_duration_secs`, `transcription_id`. The last three go into `meta`, along with the number of key terms sent.
 - Observed: corrupt audio gives `400 invalid_audio` (Refused). Silence and clips under 100 ms give `200` with empty text.
 - Timeout: 30 s.

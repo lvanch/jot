@@ -3,7 +3,7 @@
 //   ELEVENLABS_API_KEY=… deno run --allow-env --allow-read --allow-net \
 //     supabase/functions/_shared/transcriber/try.ts <audio-file> [vocabulary term …]
 //
-// Optional: ELEVENLABS_MODEL=scribe_v3, ELEVENLABS_NO_VERBATIM=1. This costs a few cents of credit at most.
+// Optional: ELEVENLABS_MODEL=scribe_v2, ELEVENLABS_NO_VERBATIM=0. This costs a few cents of credit at most.
 
 import { getTranscriber } from "./index.ts";
 

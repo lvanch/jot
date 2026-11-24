@@ -18,7 +18,7 @@ export interface TranscribeResult {
   text: string;
   /** The language the vendor reports, or null. */
   language: string | null;
-  /** The vendor's model id, e.g. "scribe_v2". */
+  /** The vendor's model id, e.g. "scribe_v3". */
   model: string;
   /** Vendor extras worth keeping on the Item, e.g. language probability. Never audio or keys. */
   meta: Record<string, unknown>;

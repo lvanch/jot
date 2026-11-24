@@ -2,8 +2,8 @@
 //
 //   TRANSCRIBER             elevenlabs (default) | fake
 //   ELEVENLABS_API_KEY      required for elevenlabs (a function secret, never committed)
-//   ELEVENLABS_MODEL        optional; defaults to scribe_v2
-//   ELEVENLABS_NO_VERBATIM  optional; "1" drops filler words
+//   ELEVENLABS_MODEL        optional; defaults to scribe_v3
+//   ELEVENLABS_NO_VERBATIM  optional; filler words are dropped unless this is "0"
 //   ALLOW_FAKE_TRANSCRIBER  "1" to permit the fake (tests only)
 
 import { createElevenLabsTranscriber } from "./elevenlabs.ts";
@@ -23,7 +23,7 @@ export function getTranscriber(env: Env = (name) => Deno.env.get(name)): Transcr
       return createElevenLabsTranscriber({
         apiKey,
         model: env("ELEVENLABS_MODEL") || undefined,
-        noVerbatim: env("ELEVENLABS_NO_VERBATIM") === "1",
+        noVerbatim: env("ELEVENLABS_NO_VERBATIM") !== "0",
       });
     }
     case "fake":

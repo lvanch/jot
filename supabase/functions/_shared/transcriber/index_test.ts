@@ -10,6 +10,25 @@ Deno.test("defaults to ElevenLabs", () => {
   assertEquals(getTranscriber(envOf({ ELEVENLABS_API_KEY: "k" })).name, "elevenlabs");
 });
 
+Deno.test("ElevenLabs settings come from the environment", async () => {
+  const sent: FormData[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = ((_url: string | URL | Request, init?: RequestInit) => {
+    sent.push(init!.body as FormData);
+    return Promise.resolve(new Response(JSON.stringify({ text: "x" }), { status: 200 }));
+  }) as typeof fetch;
+  try {
+    const base = { audio: blob(2048), mimeType: "audio/webm", vocabulary: [], language: "en" as const };
+    await getTranscriber(envOf({ ELEVENLABS_API_KEY: "k" })).transcribe(base);
+    await getTranscriber(envOf({ ELEVENLABS_API_KEY: "k", ELEVENLABS_MODEL: "scribe_v2", ELEVENLABS_NO_VERBATIM: "0" }))
+      .transcribe(base);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assertEquals([sent[0].get("model_id"), sent[0].get("no_verbatim")], ["scribe_v3", "true"]);
+  assertEquals([sent[1].get("model_id"), sent[1].get("no_verbatim")], ["scribe_v2", null]);
+});
+
 Deno.test("ElevenLabs needs its key", () => {
   assertThrows(() => getTranscriber(envOf({})), Error, "ELEVENLABS_API_KEY is not set");
 });

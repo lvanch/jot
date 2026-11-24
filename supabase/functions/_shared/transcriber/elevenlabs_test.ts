@@ -48,12 +48,12 @@ Deno.test("sends the documented request", async () => {
   assertEquals(url, ELEVENLABS_STT_URL);
   assertEquals(init.method, "POST");
   assertEquals((init.headers as Record<string, string>)["xi-api-key"], "k-123");
-  assertEquals(form.get("model_id"), "scribe_v2");
+  assertEquals(form.get("model_id"), "scribe_v3");
   assertEquals(form.get("language_code"), "en");
   assertEquals(form.get("tag_audio_events"), "false");
   assertEquals(form.get("diarize"), "false");
   assertEquals(form.get("timestamps_granularity"), "none");
-  assertEquals(form.get("no_verbatim"), null);
+  assertEquals(form.get("no_verbatim"), "true");
   assertEquals(form.getAll("keyterms"), ["Ngaio", "Fremantle"]);
   const file = form.get("file") as File;
   assertInstanceOf(file, File);
@@ -70,13 +70,13 @@ Deno.test("omits keyterms when the Vocabulary is empty", async () => {
 
 Deno.test("model and no_verbatim are configurable", async () => {
   const { fetch, calls } = stubFetch(() => ok({ text: "x" }));
-  const r = await createElevenLabsTranscriber({ apiKey: "k", fetch, model: "scribe_v3", noVerbatim: true }).transcribe(
+  const r = await createElevenLabsTranscriber({ apiKey: "k", fetch, model: "scribe_v2", noVerbatim: false }).transcribe(
     input(),
   );
-  assertEquals(calls[0].form.get("model_id"), "scribe_v3");
-  assertEquals(calls[0].form.get("no_verbatim"), "true");
-  assertEquals(r.model, "scribe_v3");
-  assertEquals(r.meta.no_verbatim, true);
+  assertEquals(calls[0].form.get("model_id"), "scribe_v2");
+  assertEquals(calls[0].form.has("no_verbatim"), false);
+  assertEquals(r.model, "scribe_v2");
+  assertEquals(r.meta.no_verbatim, undefined);
 });
 
 Deno.test("returns text, language and useful meta, nothing else", async () => {
@@ -94,8 +94,14 @@ Deno.test("returns text, language and useful meta, nothing else", async () => {
   assertEquals(r, {
     text: "Call Ngaio about the Fremantle lease",
     language: "eng",
-    model: "scribe_v2",
-    meta: { keyterms: 1, language_probability: 0.98, audio_duration_secs: 3.2, transcription_id: "tr_1" },
+    model: "scribe_v3",
+    meta: {
+      keyterms: 1,
+      language_probability: 0.98,
+      audio_duration_secs: 3.2,
+      transcription_id: "tr_1",
+      no_verbatim: true,
+    },
   });
 });
 

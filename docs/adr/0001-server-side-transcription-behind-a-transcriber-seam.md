@@ -1,12 +1,12 @@
 # Server-side transcription behind a Transcriber seam
 
-Chrome's built-in speech recognition (Web Speech) mis-hears names and jargon, and on Android there's no way to bias it. Jot now records audio and sends the Recording to a server-side function. That function calls the Transcriber, ElevenLabs Scribe v2 (batch), passing the Vocabulary as key terms. The API key lives only on the server. The vendor sits behind one Transcriber interface (Recording and Vocabulary in, Transcript out), so it can be replaced without touching Jot or the Inbox.
+Chrome's built-in speech recognition (Web Speech) mis-hears names and jargon, and on Android there's no way to bias it. Jot now records audio and sends the Recording to a server-side function. That function calls the Transcriber, ElevenLabs Scribe (batch, model `scribe_v3`), passing the Vocabulary as key terms. The API key lives only on the server. The vendor sits behind one Transcriber interface (Recording and Vocabulary in, Transcript out), so it can be replaced without touching Jot or the Inbox.
 
 ## Considered options
 
 - **Keep Web Speech.** Rejected because accuracy is the problem and it has no vocabulary hints on Android.
 - **On-device model (e.g. Whisper in WASM).** Rejected: a large download, slow on the phone, and no better at names without hints.
-- **Other cloud vendors.** Any of them can go behind the same seam later. Scribe v2 was picked for accuracy plus key-term prompting.
+- **Other cloud vendors.** Any of them can go behind the same seam later. Scribe was picked for accuracy plus key-term prompting.
 
 ## Consequences
 
@@ -18,4 +18,8 @@ Chrome's built-in speech recognition (Web Speech) mis-hears names and jargon, an
   - Key terms go as repeated `keyterms` fields: at most 1000, each at most 50 characters and 5 words.
   - Chrome's `audio/webm;codecs=opus` is accepted.
   - Without the Vocabulary, Scribe v2 heard "Kalgoorlie" as "Calgary". With it, the sentence came back exactly right, in about 1 s.
-- Scribe v3, released after this decision, is the same price, takes the same API and claims 27% fewer errors. Switching is one setting (`ELEVENLABS_MODEL=scribe_v3`).
+- **Update, 2026-11-24 (the Owner's call):**
+  - The default model moves from `scribe_v2` to `scribe_v3`, which came out after this decision. It's the same price and API, and claims 27% fewer errors.
+  - Filler words are dropped (`no_verbatim`), so "um", "uh" and false starts never reach the Transcript.
+  - Both are settings (`ELEVENLABS_MODEL`, `ELEVENLABS_NO_VERBATIM=0`), so either can be reverted without a deploy of new code.
+  - A live check with these defaults returned the test sentence exactly right in 0.9 s.

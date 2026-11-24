@@ -12,7 +12,7 @@ import {
 } from "./types.ts";
 
 export const ELEVENLABS_STT_URL = "https://api.elevenlabs.io/v1/speech-to-text";
-export const DEFAULT_MODEL = "scribe_v2";
+export const DEFAULT_MODEL = "scribe_v3";
 export const DEFAULT_TIMEOUT_MS = 30_000;
 
 /**
@@ -33,9 +33,9 @@ const REFUSED_STATUSES = new Set([400, 413, 415, 422]);
 
 export interface ElevenLabsOptions {
   apiKey: string;
-  /** Model id; defaults to scribe_v2. */
+  /** Model id; defaults to scribe_v3. */
   model?: string;
-  /** Drop filler words and false starts ("um", "uh"). Off by default. */
+  /** Drop filler words and false starts ("um", "uh"). On by default. */
   noVerbatim?: boolean;
   timeoutMs?: number;
   /** Injected in tests. */
@@ -74,7 +74,7 @@ export function filenameFor(mimeType: string): string {
 }
 
 export function createElevenLabsTranscriber(options: ElevenLabsOptions): Transcriber {
-  const { apiKey, model = DEFAULT_MODEL, noVerbatim = false, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
+  const { apiKey, model = DEFAULT_MODEL, noVerbatim = true, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
   const doFetch = options.fetch ?? fetch;
   if (!apiKey) throw new Error("ElevenLabs API key is missing");
 
