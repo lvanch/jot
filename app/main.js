@@ -7,6 +7,7 @@ import { initSignIn, showSignIn } from './signin.js';
 import { initStrip } from './strip.js';
 import { $, setStatus, toast } from './ui.js';
 import { createUploader } from './uploader.js';
+import { cleanUpV1, importMessage, importV1 } from './v1import.js';
 import { initVocabulary } from './vocab-screen.js';
 
 const inbox = configured ? createInbox() : null;
@@ -60,20 +61,48 @@ strip.render();
 let mic = null; // the mic, set up below
 const vocab = initVocabulary({ inbox, onOpen: () => mic?.leave() });
 
+// ---------- v1's list: imported into the Inbox once, on sign-in; v1's storage goes 30 days later (ADR-0004) ----------
+
+let signedIn = false;
+let importing = false;
+
+async function importV1List() {
+  if (!inbox || !signedIn || importing) return;
+  importing = true;
+  try {
+    const r = await importV1({ inbox, storage: localStorage, now: Date.now() });
+    if (r.result === 'imported' && r.count) toast(importMessage(r.count));
+    // 'failed' leaves it to the next sign-in or foreground
+  } catch {
+    // storage blocked: nothing to import from
+  } finally {
+    importing = false;
+  }
+}
+
+try {
+  cleanUpV1(localStorage, Date.now());
+} catch {
+  // storage blocked
+}
+
 // ---------- Signed in or not ----------
 
 const accountBtn = $('account');
 const menu = $('account-menu');
 
 function render(session) {
-  const signedIn = !!session;
+  signedIn = !!session;
   showSignIn(!signedIn);
   accountBtn.hidden = !signedIn;
   $('account-email').textContent = session?.user?.email ?? '';
   if (!signedIn) closeMenu();
   uploader.setSignedIn(signedIn);
   vocab.setSignedIn(signedIn);
-  if (signedIn) strip.refresh();
+  if (signedIn) {
+    strip.refresh();
+    importV1List();
+  }
 }
 
 if (inbox) {
@@ -167,5 +196,6 @@ document.addEventListener('visibilitychange', () => {
   else {
     uploader.kick(true);
     strip.refresh(); // someone may have processed or edited an Item meanwhile
+    importV1List(); // if it failed last time
   }
 });
