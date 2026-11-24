@@ -1,8 +1,8 @@
 # Inbox backend (Supabase)
 
-This is the Inbox's database and its Edge Functions. Design: [`docs/spec/jot-v2.md`](../docs/spec/jot-v2.md) §3–§5. Vocabulary: [`CONTEXT.md`](../CONTEXT.md).
+This is the Inbox's database and its Edge Functions. Design: [`docs/spec/jot-v2.md`](../docs/spec/jot-v2.md) §3–§5. Vocabulary: [`CONTEXT.md`](../CONTEXT.md). Apps and agents that read the Inbox: [`docs/inbox-contract.md`](../docs/inbox-contract.md).
 
-- **Migrations:** `migrations/`. Tables, row-level security, the lifecycle functions, the `recordings` bucket and Realtime.
+- **Migrations:** `migrations/`. Tables, row-level security, the lifecycle functions, the `recordings` bucket and Realtime. A later migration makes `not_found` an HTTP 404 (SQLSTATE `PT404`).
 - **Seed:** `seed.sql`. **Local only:** an Owner (`owner@jot.local`) and a processor agent (`claude@jot.local`, password `local-claude-password`).
 - **Functions:** `functions/`.
   - `transcribe` turns a Recording into a parked Item.

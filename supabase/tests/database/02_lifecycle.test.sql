@@ -42,7 +42,7 @@ select is((select status_at from public.items where id = 't-1'), now(), 'process
 select is((public.process_item('t-1')).outcome, '{"to":"calendar"}'::jsonb,
   'processing again by the same processor returns the Item unchanged');
 
-select throws_ok($$select public.process_item('nope')$$, 'P0002', 'not_found', 'processing a missing Item is not_found');
+select throws_ok($$select public.process_item('nope')$$, 'PT404', 'not_found', 'processing a missing Item is not_found');
 select throws_ok($$select public.discard_item('t-2')$$, '42501', 'not_allowed', 'a processor cannot discard');
 select throws_ok($$select public.restore_item('t-2')$$, '42501', 'not_allowed', 'a processor cannot restore');
 select throws_ok($$select public.edit_item_text('t-2', 'x')$$, '42501', 'not_allowed', 'a processor cannot edit Text');
@@ -85,8 +85,8 @@ select throws_ok($$select public.edit_item_text('t-2', '   ')$$, '22023', 'inval
 select throws_ok($$select public.edit_item_text('t-2', repeat('x', 2001))$$, '22023', 'invalid_text',
   'Text over 2000 characters is invalid_text');
 select throws_ok($$select public.edit_item_text('t-1', 'x')$$, 'P0001', 'wrong_state', 'a processed Item cannot be edited');
-select throws_ok($$select public.edit_item_text('nope', 'x')$$, 'P0002', 'not_found', 'editing a missing Item is not_found');
-select throws_ok($$select public.discard_item('nope')$$, 'P0002', 'not_found', 'discarding a missing Item is not_found');
+select throws_ok($$select public.edit_item_text('nope', 'x')$$, 'PT404', 'not_found', 'editing a missing Item is not_found');
+select throws_ok($$select public.discard_item('nope')$$, 'PT404', 'not_found', 'discarding a missing Item is not_found');
 
 -- the Owner processes too
 select is((public.process_item('t-3', '"done by hand"')).processed_by, 'owner', 'the Owner can process an Item');
