@@ -1,7 +1,8 @@
 // Jot v2: capture-only (ADR-0004). This boots the shell: sign-in, the account menu, the mic, and the service
-// worker. Recording (#8), the queue (#9) and the recent-Captures strip (#10) plug in here as they land.
+// worker. The queue (#9) and the recent-Captures strip (#10) plug in here as they land.
 
 import { configured, createInbox } from './inbox.js';
+import { initCapture } from './capture.js';
 import { initSignIn, showSignIn } from './signin.js';
 import { $, setStatus, toast } from './ui.js';
 
@@ -61,18 +62,21 @@ $('sign-out').addEventListener('click', async () => {
   toast(error ? "Couldn't sign out. Try again." : 'Signed out');
 });
 
-// ---------- Mic (recording arrives in #8) ----------
+// ---------- Mic: each kept Recording becomes a Capture ----------
 
 const micBtn = $('mic');
 const fabBtn = $('fab');
 
-function onMicTap() {
-  toast("Recording isn't wired up yet");
-}
-
-micBtn.addEventListener('click', onMicTap);
-fabBtn.addEventListener('click', onMicTap);
-setStatus('Tap to speak');
+initCapture({
+  onCapture(capture) {
+    // The queue (#9) takes over from here. Until then, say what was recorded and announce it, so tests can see it.
+    setStatus(`Recorded ${(capture.durationMs / 1000).toFixed(1)} s · sending arrives with the queue`);
+    const { id, blob, mimeType, durationMs, device, stop } = capture;
+    window.dispatchEvent(
+      new CustomEvent('jot:capture', { detail: { id, size: blob.size, mimeType, durationMs, device, stop } }),
+    );
+  },
+});
 
 if ('IntersectionObserver' in window) {
   new IntersectionObserver(([entry]) => {

@@ -1,11 +1,15 @@
 'use strict';
 
 // Bump on every deploy so clients pick up the new shell.
-const CACHE = 'jot-v4';
+const CACHE = 'jot-v5';
 
 const SHELL = [
   './', // not 'index.html': some hosts redirect it to './'
   'main.js',
+  'capture.js',
+  'recorder.js',
+  'silence.js',
+  'mic-errors.js',
   'inbox.js',
   'signin.js',
   'auth-errors.js',

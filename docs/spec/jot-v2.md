@@ -296,17 +296,24 @@ The modules that hold logic stay pure and get unit tests:
 - `getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })`.
 - `MediaRecorder` at `audioBitsPerSecond: 32000`, using the first supported type from `audio/webm;codecs=opus`, `audio/ogg;codecs=opus`, `audio/mp4`.
 
-**Silence detection.** An `AnalyserNode` measures the RMS level every 50 ms.
-- Speech starts when the level stays above `SPEECH_DB` for 150 ms.
-- After speech has started, 1500 ms below `SILENCE_DB` stops the recording.
-- If no speech arrives within 8 s, the recording stops and is thrown away, and the status says "Didn't catch that". Nothing is uploaded.
-- `SPEECH_DB` and `SILENCE_DB` are tunable constants.
+**Silence detection** (`silence.js`, pure and unit-tested). An `AnalyserNode` measures the RMS level every 50 ms.
+- **Thresholds follow the noise floor.** The floor is the quietest recent level. It drops at once, and rises at most 2 dB/s so it follows a car starting but not a voice.
+  - Speech means at least −45 dBFS *and* 12 dB above the floor.
+  - Quiet means below −52 dBFS *or* within 6 dB of the floor.
+- **Start, stop, give up.**
+  - Speech starts when the level stays at speech level for 150 ms, so clicks and bumps don't count.
+  - After speech has started, 1500 ms of quiet stops the recording.
+  - If no speech arrives within 8 s, the recording stops and is thrown away, and the status says "Didn't catch that". Nothing is uploaded.
+- All the numbers are in `DEFAULTS` in `silence.js`.
+- **No-meter fallback.** If the AudioContext can't run (autoplay rules), Jot records without metering. The status says "Listening… tap when you're done", it runs until a tap or the cap, and the Recording is kept.
+- **Halo.** While listening, the mic's halo grows with the voice (`--level`).
 
-**Limits and interruptions.**
-- **Hard cap:** 60 s, after which Jot stops and uploads.
-- **Going to the background mid-recording:** Jot stops. If speech had been detected it uploads; otherwise it throws the recording away.
+**Limits and interruptions** (`keepRecording()` in `silence.js`).
+- **Hard cap:** 60 s, after which Jot stops. The Recording is kept if speech was detected.
+- **A tap** stops the recording. It's kept if speech was detected or it ran for at least 1 s, because a deliberate tap is worth sending; an instant tap-tap is a cancel.
+- **Going to the background mid-recording:** Jot stops. It keeps the Recording only if speech was detected.
 
-**After stopping.** The Capture `{ id: crypto.randomUUID(), blob, mimeType, capturedAt, durationMs, device }` goes into the queue and uploads straight away.
+**After stopping.** `capture.js` hands the Capture `{ id: crypto.randomUUID(), blob, mimeType, capturedAt, durationMs, device, stop }` to `onCapture`, which puts it in the queue (#9) to upload straight away. `main.js` also fires a `jot:capture` event on `window` with everything except the blob; the end-to-end tests watch for it.
 
 **Device name.** `phone` on coarse-pointer devices, otherwise `desktop`.
 

@@ -7,7 +7,8 @@
 
 import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -77,15 +78,60 @@ export async function serveApp() {
   return { url: `http://127.0.0.1:${server.address().port}/`, close: () => new Promise((r) => server.close(r)) };
 }
 
-/** A browser with a phone-sized page that records CSP violations and console errors. */
-export async function openJot(url, { serviceWorkers = 'block', storageState } = {}) {
-  const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers, storageState });
+export const SPEECH_WAV = fileURLToPath(new URL('../fixtures/speech.wav', import.meta.url));
+
+/** Writes `seconds` of digital silence as a 16 kHz mono WAV and returns its path. */
+export async function silentWav(seconds = 12) {
+  const rate = 16000;
+  const data = rate * seconds * 2;
+  const wav = Buffer.alloc(44 + data);
+  wav.write('RIFF', 0);
+  wav.writeUInt32LE(36 + data, 4);
+  wav.write('WAVEfmt ', 8);
+  wav.writeUInt32LE(16, 16); // fmt chunk size
+  wav.writeUInt16LE(1, 20); // PCM
+  wav.writeUInt16LE(1, 22); // mono
+  wav.writeUInt32LE(rate, 24);
+  wav.writeUInt32LE(rate * 2, 28); // byte rate
+  wav.writeUInt16LE(2, 32); // block align
+  wav.writeUInt16LE(16, 34); // bits per sample
+  wav.write('data', 36);
+  wav.writeUInt32LE(data, 40);
+  const path = join(tmpdir(), `jot-silence-${seconds}s.wav`);
+  await writeFile(path, wav);
+  return path;
+}
+
+/**
+ * A browser with a phone-sized page that records CSP violations and console errors.
+ * `audioFile` plays as the microphone (looped). `phone` emulates a touch phone, where Jot starts listening on
+ * its own. Autoplay is allowed, as it is for an installed PWA, so the level meter runs without a tap.
+ */
+export async function openJot(url, { serviceWorkers = 'block', storageState, audioFile, phone = false } = {}) {
+  const args = audioFile
+    ? [
+      '--use-fake-device-for-media-stream',
+      '--use-fake-ui-for-media-stream',
+      `--use-file-for-fake-audio-capture=${audioFile}`,
+      '--autoplay-policy=no-user-gesture-required',
+    ]
+    : [];
+  const browser = await chromium.launch({ args });
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    serviceWorkers,
+    storageState,
+    ...(phone ? { isMobile: true, hasTouch: true } : {}),
+    ...(audioFile ? { permissions: ['microphone'] } : {}),
+  });
   const problems = [];
   await context.addInitScript(() => {
     document.addEventListener('securitypolicyviolation', (e) => {
       console.error(`CSP violation: ${e.violatedDirective} ${e.blockedURI}`);
     });
+    // Every Capture Jot emits (see main.js), for tests to inspect.
+    window.__captures = [];
+    window.addEventListener('jot:capture', (e) => window.__captures.push(e.detail));
   });
   const page = await context.newPage();
   page.on('console', (msg) => {
