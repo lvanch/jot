@@ -1,12 +1,48 @@
-// Jot v2: capture-only (ADR-0004). This boots the shell: sign-in, the account menu, the mic, and the service
-// worker. The queue (#9) and the recent-Captures strip (#10) plug in here as they land.
+// Jot v2: capture-only (ADR-0004). This boots the shell: sign-in, the account menu, the mic, the queue, and the
+// service worker. The recent-Captures strip (#10) plugs in here when it lands.
 
-import { configured, createInbox } from './inbox.js';
 import { initCapture } from './capture.js';
+import { configured, createInbox, functionsUrl, SUPABASE_PUBLISHABLE_KEY } from './inbox.js';
 import { initSignIn, showSignIn } from './signin.js';
 import { $, setStatus, toast } from './ui.js';
+import { createUploader } from './uploader.js';
 
 const inbox = configured ? createInbox() : null;
+
+// ---------- Status line: the mic speaks while listening, otherwise the queue, otherwise the mic's last word ----------
+
+let captureText = 'Tap to speak';
+let listening = false;
+let queueText = null;
+
+function renderStatus() {
+  setStatus(listening ? captureText : (queueText ?? captureText), listening);
+}
+
+// ---------- The queue: every kept Recording goes to transcribe and becomes an Item ----------
+
+const uploader = createUploader({
+  inbox,
+  functionsUrl,
+  publishableKey: SUPABASE_PUBLISHABLE_KEY,
+  onStatus(text) {
+    queueText = text;
+    renderStatus();
+  },
+  onParked(item) {
+    captureText = 'Tap to add another';
+    renderStatus();
+    toast('Parked'); // Undo arrives with the recent-Captures strip (#10)
+    window.dispatchEvent(new CustomEvent('jot:parked', { detail: { id: item.id, text: item.text } }));
+  },
+  onEmpty() {
+    captureText = 'Didn’t catch that — tap to speak';
+    renderStatus();
+  },
+  onFailed() {
+    toast('Couldn’t transcribe that one');
+  },
+});
 
 // ---------- Signed in or not ----------
 
@@ -19,6 +55,7 @@ function render(session) {
   accountBtn.hidden = !signedIn;
   $('account-email').textContent = session?.user?.email ?? '';
   if (!signedIn) closeMenu();
+  uploader.setSignedIn(signedIn);
 }
 
 if (inbox) {
@@ -62,15 +99,19 @@ $('sign-out').addEventListener('click', async () => {
   toast(error ? "Couldn't sign out. Try again." : 'Signed out');
 });
 
-// ---------- Mic: each kept Recording becomes a Capture ----------
+// ---------- Mic: each kept Recording becomes a Capture, and goes in the queue ----------
 
 const micBtn = $('mic');
 const fabBtn = $('fab');
 
 initCapture({
+  onStatus(text, isListening) {
+    captureText = text;
+    listening = isListening;
+    renderStatus();
+  },
   onCapture(capture) {
-    // The queue (#9) takes over from here. Until then, say what was recorded and announce it, so tests can see it.
-    setStatus(`Recorded ${(capture.durationMs / 1000).toFixed(1)} s · sending arrives with the queue`);
+    uploader.add(capture);
     const { id, blob, mimeType, durationMs, device, stop } = capture;
     window.dispatchEvent(
       new CustomEvent('jot:capture', { detail: { id, size: blob.size, mimeType, durationMs, device, stop } }),
@@ -83,6 +124,11 @@ if ('IntersectionObserver' in window) {
     fabBtn.hidden = entry.isIntersecting;
   }).observe(micBtn);
 }
+
+// Send what's waiting: now (after a crash or reload mid-upload), when the network returns, and on foreground.
+uploader.resume();
+window.addEventListener('online', () => uploader.kick(true));
+window.addEventListener('offline', () => uploader.kick());
 
 // ---------- Service worker: pick up new versions the next time Jot comes to the foreground ----------
 
@@ -97,5 +143,7 @@ if ('serviceWorker' in navigator) {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && reloadOnResume) location.reload();
+  if (document.visibilityState !== 'visible') return;
+  if (reloadOnResume) location.reload();
+  else uploader.kick(true);
 });
