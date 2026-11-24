@@ -228,9 +228,10 @@ t("other methods are refused, and browsers get CORS only from Jot's origin", asy
 
 // ---------- health ----------
 
-t("health answers without credentials", async () => {
-  const res = await fetch(`${FUNCTIONS}/health`);
+t("health answers without credentials, to any origin", async () => {
+  const res = await fetch(`${FUNCTIONS}/health`, { headers: { Origin: "https://lvanch.github.io" } });
   assertEquals(res.status, 200);
+  assertEquals(res.headers.get("access-control-allow-origin"), "*");
   assertEquals(await res.json(), { ok: true });
 });
 

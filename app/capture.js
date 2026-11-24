@@ -13,9 +13,9 @@ export const DEVICE = AUTO_LISTEN ? 'phone' : 'desktop';
 /**
  * @typedef {{ id: string, blob: Blob, mimeType: string, capturedAt: number, durationMs: number, device: string,
  *   stop: string }} Capture
- * @param {{ onCapture: (capture: Capture) => void }} options
+ * @param {{ onCapture: (capture: Capture) => void, onStatus?: (text: string, listening: boolean) => void }} options
  */
-export function initCapture({ onCapture }) {
+export function initCapture({ onCapture, onStatus = setStatus }) {
   const micBtn = $('mic');
   const fabBtn = $('fab');
   let session = null; // the Recording in progress: { handle, auto }
@@ -37,31 +37,31 @@ export function initCapture({ onCapture }) {
     if (session || opening) return;
     if (!pickMimeType()) {
       micBtn.classList.add('is-unsupported');
-      setStatus(micErrorMessage({ name: 'NotSupportedError' }, auto));
+      onStatus(micErrorMessage({ name: 'NotSupportedError' }, auto), false);
       return;
     }
     opening = true;
     setListening(true);
-    setStatus('Listening…', true);
+    onStatus('Listening…', true);
     let handle;
     try {
       handle = await startRecording({ onLevel: showLevel });
     } catch (err) {
       setListening(false);
-      setStatus(micErrorMessage(err, auto));
+      onStatus(micErrorMessage(err, auto), false);
       return;
     } finally {
       opening = false;
     }
     session = { handle, auto };
-    if (!handle.metering) setStatus('Listening… tap when you’re done', true);
+    if (!handle.metering) onStatus('Listening… tap when you’re done', true);
     if (document.visibilityState === 'hidden') handle.stop('hidden');
 
     const result = await handle.done;
     session = null;
     setListening(false);
     if (keepRecording(result.reason, result.heard, result.durationMs) && result.blob.size > 0) {
-      setStatus('Tap to add another');
+      onStatus('Tap to add another', false);
       onCapture({
         id: crypto.randomUUID(),
         blob: result.blob,
@@ -72,7 +72,7 @@ export function initCapture({ onCapture }) {
         stop: result.reason,
       });
     } else {
-      setStatus(result.reason === 'hidden' ? 'Tap to speak' : 'Didn’t catch that — tap to speak');
+      onStatus(result.reason === 'hidden' ? 'Tap to speak' : 'Didn’t catch that — tap to speak', false);
     }
   }
 
@@ -110,7 +110,7 @@ export function initCapture({ onCapture }) {
     if (e.persisted) onForeground();
   });
 
-  setStatus('Tap to speak');
+  onStatus('Tap to speak', false);
   if (document.visibilityState === 'visible') onForeground();
 
   return { start, onForeground };

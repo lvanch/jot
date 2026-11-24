@@ -7,7 +7,9 @@ import { createSupabaseContext } from "@supabase/server";
 export default { fetch: serve };
 
 async function serve(req: Request): Promise<Response> {
-  const headers = { "Cache-Control": "no-store" };
+  // Public and data-free, so any origin may read it: Jot calls it from the browser to tell "the Inbox is asleep"
+  // apart from "the Transcriber is down".
+  const headers = { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" };
   if (req.method !== "GET" && req.method !== "HEAD") {
     return Response.json({ error: "method_not_allowed" }, { status: 405, headers });
   }

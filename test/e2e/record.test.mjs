@@ -44,7 +44,8 @@ test('speech, then silence: one Capture of Opus in WebM, stopped by the silence'
     assert.match(c.id, /^[0-9a-f-]{36}$/);
 
     await page.waitForSelector('#mic[aria-pressed="false"]');
-    assert.match(await page.textContent('#status'), /^Recorded \d+\.\d s/);
+    // Signed out here, so the queue holds it (sending is covered in queue.test.mjs).
+    await page.waitForFunction(() => document.getElementById('status').textContent === 'Sign in to send · 1 queued');
     assert.equal((await captures(page)).length, 1, 'exactly one Capture');
   });
 });

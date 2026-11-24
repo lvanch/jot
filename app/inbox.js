@@ -1,7 +1,10 @@
 // The one Supabase client Jot uses. supabase-js is vendored as a classic script (vendor/supabase.js), which
 // defines window.supabase before any module runs.
 
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './config.js';
+import { FUNCTIONS_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './config.js';
+
+export { SUPABASE_PUBLISHABLE_KEY };
+export const functionsUrl = (FUNCTIONS_URL || `${SUPABASE_URL}/functions/v1`).replace(/\/+$/, '');
 
 /** False until config.js holds the real project's values. */
 export const configured = !SUPABASE_URL.includes('YOUR-PROJECT-REF') && !SUPABASE_PUBLISHABLE_KEY.includes('REPLACE_ME');

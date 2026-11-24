@@ -6,3 +6,6 @@
 
 export const SUPABASE_URL = 'https://YOUR-PROJECT-REF.supabase.co';
 export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_REPLACE_ME';
+
+// Optional: where the Edge Functions live, if not at SUPABASE_URL/functions/v1. Only local test setups need it.
+export const FUNCTIONS_URL = '';

@@ -242,7 +242,7 @@ class TranscriberRefused extends Error { status?: number }      // never retry: 
 ### `health`
 
 `GET /functions/v1/health` (`supabase/functions/health/`)
-- Needs no auth (`verify_jwt = false`).
+- Needs no auth (`verify_jwt = false`), and answers any origin (`Access-Control-Allow-Origin: *`) so Jot can tell "the Inbox is asleep" from the browser.
 - Runs one count query on `members` with the secret key and returns `200 {ok:true}`, or `503 {ok:false}`.
 - Exposes no data.
 - Other methods get `405`.
@@ -319,30 +319,44 @@ The modules that hold logic stay pure and get unit tests:
 
 ### Queue and upload
 
-**Storage.** IndexedDB `jot` with store `captures`. Each record is `{ id, blob, mimeType, capturedAt, durationMs, device, state: 'queued'|'uploading'|'failed', attempts, lastError, nextAttemptAt }`. A record is deleted only when the server confirms it with `201`, `200 {item}`, or `200 {empty:true}`.
+Three modules handle this:
+- `queue.js`: the rules. Pure and unit-tested.
+- `store.js`: IndexedDB.
+- `uploader.js`: the requests.
+
+**Storage.**
+- IndexedDB database `jot`, store `captures`, one record per Capture: `{ id, blob, mimeType, capturedAt, durationMs, device, state: 'queued'|'uploading'|'failed', attempts, lastError, nextAttemptAt }`.
+- A record is deleted only when the server confirms it with `201`, `200 {item}` or `200 {empty:true}`.
+- On boot, any record stuck at `uploading` (after a crash or reload mid-upload) goes back to `queued`.
+
+**Sending.**
+- One upload at a time, oldest Capture first, under a Web Lock (`jot-upload`) so tabs don't race.
+- Each upload is `POST {functions}/transcribe` with the session's access token and the publishable key, and a 45 s timeout.
+- `{functions}` is `SUPABASE_URL/functions/v1`, unless `config.js` sets `FUNCTIONS_URL` (local tests only).
 
 | Response | Action |
 |---|---|
-| `201`, or `200` with an item | Remove from the queue, add to the recent strip, show the toast "Parked · Undo" for 5 s |
-| `200 {empty:true}` | Remove from the queue; status "Didn't catch that" |
-| Network error, `5xx`, `502` | Stays queued, backoff 2 s × 2ⁿ (max 5 min, ±25 % jitter). Also retries on `online`, on foreground, and on every new Capture. |
-| `429 daily_cap` | Stays queued, `nextAttemptAt = retry_at`; status "Daily limit reached · N queued" |
-| `401` | Stays queued and the sign-in screen is shown |
-| `413`, `422`, `400` | Marked `failed`, with Retry and Throw away in the strip |
+| `201`, or `200` with an item | Remove from the queue; toast "Parked". Undo arrives with the strip (#10). Fires `jot:parked`. |
+| `200 {empty:true}` | Remove from the queue; status "Didn't catch that — tap to speak" |
+| No answer, `5xx`, or any other unexpected status (e.g. `404` mid-deploy, a bare `429`) | Stays queued. Backoff is 2 s × 2ⁿ (max 5 min, ±25 % jitter) and holds the whole queue, so a struggling server isn't hammered. A new Capture, coming online, foregrounding or signing in skips the backoff. |
+| `429 daily_cap` | Stays queued, and the whole queue waits until `retry_at`; status "Daily limit reached · N queued" |
+| `401` | Stays queued. Jot signs out on this device, so the sign-in card shows, and signing in sends the queue. |
+| `400`, `413`, `422` | Marked `failed`, with the Recording kept; toast "Couldn't transcribe that one". Retry and Throw away arrive with the strip (#10). |
 
-Uploads run one at a time, in capture order, under a Web Lock across tabs.
-
-**Status line.**
+**Status line.** While recording, the mic speaks. Otherwise the queue does (`queueStatus()`, most urgent first). Otherwise the mic's last message shows.
 
 | When | Status text |
 |---|---|
 | Recording | `Listening…` |
 | Uploading | `Transcribing…` |
 | Offline (`navigator.onLine === false`) with Captures queued | `Offline · N queued` |
-| Online, but the Supabase project is unreachable (a network error or `5xx` from both `transcribe` and `health`) | `Inbox asleep · N queued` |
-| Nothing in progress | `Tap to speak` |
+| Signed out with Captures queued | `Sign in to send · N queued` |
+| Waiting on the daily cap | `Daily limit reached · N queued` |
+| The upload failed with no answer or a `5xx`, *and* `GET {functions}/health` fails too | `Inbox asleep · N queued` |
+| Otherwise, Captures waiting on a backoff | `Waiting to send · N queued` |
+| Nothing in progress | the mic's message, e.g. `Tap to speak`, `Tap to add another` |
 
-**⚠ verify** what a paused Supabase project actually returns, and match on it.
+`health` answers any origin (`Access-Control-Allow-Origin: *`), so the browser can make this check. **⚠ verify** what a paused Supabase project actually returns. Today, "no answer or `5xx` from both" covers it.
 
 ### Recent-Captures strip
 

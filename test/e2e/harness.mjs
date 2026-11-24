@@ -17,6 +17,9 @@ const { chromium } = require('playwright');
 
 const APP_DIR = fileURLToPath(new URL('../../app/', import.meta.url));
 export const API_URL = process.env.API_URL ?? 'http://127.0.0.1:54321';
+// Where the Edge Functions answer. Through the gateway by default; set it when they're served on the host
+// instead (supabase/tests/functions/serve_local.ts).
+export const FUNCTIONS_URL = process.env.FUNCTIONS_URL ?? `${API_URL}/functions/v1`;
 const PUBLISHABLE_KEY = process.env.PUBLISHABLE_KEY;
 const MAILPIT_URL = process.env.MAILPIT_URL ?? 'http://127.0.0.1:54324';
 
@@ -33,13 +36,14 @@ const TYPES = {
 /** Production's CSP (spec §6), with the local Supabase in place of the hosted one. */
 export function csp(apiUrl = API_URL) {
   const ws = apiUrl.replace(/^http/, 'ws');
+  const functionsOrigin = new URL(FUNCTIONS_URL).origin;
   return [
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self'",
     "img-src 'self' data:",
     "media-src 'self' blob:",
-    `connect-src 'self' ${apiUrl} ${ws}`,
+    `connect-src 'self' ${apiUrl} ${ws}${functionsOrigin === new URL(apiUrl).origin ? '' : ` ${functionsOrigin}`}`,
     "manifest-src 'self'",
     "worker-src 'self'",
     "object-src 'none'",
@@ -52,7 +56,8 @@ export function csp(apiUrl = API_URL) {
 export async function serveApp() {
   if (!PUBLISHABLE_KEY) throw new Error('PUBLISHABLE_KEY is not set: run  set -a; eval "$(supabase status -o env)"; set +a');
   const config = `export const SUPABASE_URL = ${JSON.stringify(API_URL)};\n` +
-    `export const SUPABASE_PUBLISHABLE_KEY = ${JSON.stringify(PUBLISHABLE_KEY)};\n`;
+    `export const SUPABASE_PUBLISHABLE_KEY = ${JSON.stringify(PUBLISHABLE_KEY)};\n` +
+    `export const FUNCTIONS_URL = ${JSON.stringify(FUNCTIONS_URL)};\n`;
   const server = createServer(async (req, res) => {
     const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     const rel = path.endsWith('/') ? path + 'index.html' : path;
@@ -129,14 +134,17 @@ export async function openJot(url, { serviceWorkers = 'block', storageState, aud
     document.addEventListener('securitypolicyviolation', (e) => {
       console.error(`CSP violation: ${e.violatedDirective} ${e.blockedURI}`);
     });
-    // Every Capture Jot emits (see main.js), for tests to inspect.
+    // Every Capture Jot emits and every Item it parks (see main.js), for tests to inspect.
     window.__captures = [];
+    window.__parked = [];
     window.addEventListener('jot:capture', (e) => window.__captures.push(e.detail));
+    window.addEventListener('jot:parked', (e) => window.__parked.push(e.detail));
   });
   const page = await context.newPage();
   page.on('console', (msg) => {
-    // A refused request (e.g. a 422 for an unknown email) is the server's answer, not an app error.
-    if (msg.type() === 'error' && !/^Failed to load resource: the server responded with a status of/.test(msg.text())) {
+    // A refused request (a 422 for an unknown email) or a dropped one (a test cutting the network) is the
+    // network's doing, not an app error. CORS refusals and CSP violations still count.
+    if (msg.type() === 'error' && !/^Failed to load resource: (the server responded with a status of|net::ERR_)/.test(msg.text())) {
       problems.push(msg.text());
     }
   });
@@ -164,4 +172,75 @@ export async function latestCode(email) {
     await new Promise((r) => setTimeout(r, 200));
   }
   throw new Error(`no sign-in code arrived for ${email}`);
+}
+
+// ---------- Signing in once, for tests that only need a signed-in Owner ----------
+
+/** Signs the seeded Owner in through the real UI and returns the browser storage to reuse in later contexts. */
+export async function ownerSession(appUrl) {
+  await clearMail();
+  const jot = await openJot(appUrl);
+  try {
+    await jot.page.fill('#email', 'owner@jot.local');
+    await jot.page.click('#email-form button[type=submit]');
+    await jot.page.waitForSelector('#code-form:not([hidden])');
+    await jot.page.fill('#code', await latestCode('owner@jot.local'));
+    await jot.page.click('#code-form button[type=submit]');
+    await jot.page.waitForSelector('#account:not([hidden])');
+    return await jot.context.storageState();
+  } finally {
+    await jot.browser.close();
+  }
+}
+
+// ---------- Looking at the Inbox directly (secret key: tests only) ----------
+
+const SECRET_KEY = process.env.SECRET_KEY;
+
+async function rest(path, init = {}) {
+  if (!SECRET_KEY) throw new Error('SECRET_KEY is not set: run  set -a; eval "$(supabase status -o env)"; set +a');
+  const res = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: { apikey: SECRET_KEY, 'Content-Type': 'application/json', ...init.headers },
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${init.method ?? 'GET'} ${path}: ${res.status} ${text}`);
+  return text ? JSON.parse(text) : null;
+}
+
+const inList = (ids) => `in.(${ids.map((id) => `"${id}"`).join(',')})`;
+
+export const itemsById = (ids) => rest(`/rest/v1/items?id=${inList(ids)}&select=*`);
+export const logFor = (id) => rest(`/rest/v1/transcription_log?item_id=eq.${id}&select=outcome`);
+
+/** Removes Items, their log rows and their Recordings. */
+export async function removeItems(ids) {
+  if (!ids.length) return;
+  const items = await itemsById(ids);
+  const paths = items.map((i) => i.recording_path).filter(Boolean);
+  if (paths.length) {
+    await rest('/storage/v1/object/recordings', { method: 'DELETE', body: JSON.stringify({ prefixes: paths }) });
+  }
+  await rest(`/rest/v1/items?id=${inList(ids)}`, { method: 'DELETE' });
+  await rest(`/rest/v1/transcription_log?item_id=${inList(ids)}`, { method: 'DELETE' });
+}
+
+/** What Jot holds in IndexedDB, without the Recordings. */
+export function queued(page) {
+  return page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const req = indexedDB.open('jot', 1);
+        req.onupgradeneeded = () => req.result.createObjectStore('captures', { keyPath: 'id' });
+        req.onerror = () => reject(req.error);
+        req.onsuccess = () => {
+          const all = req.result.transaction('captures').objectStore('captures').getAll();
+          all.onsuccess = () => {
+            resolve(all.result.map(({ blob, ...rest }) => ({ ...rest, size: blob.size })));
+            req.result.close();
+          };
+          all.onerror = () => reject(all.error);
+        };
+      }),
+  );
 }
