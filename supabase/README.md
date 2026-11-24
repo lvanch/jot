@@ -1,10 +1,17 @@
 # Inbox backend (Supabase)
 
-This is the Inbox's database, and later its Edge Functions. Design: [`docs/spec/jot-v2.md`](../docs/spec/jot-v2.md) §3–§5. Vocabulary: [`CONTEXT.md`](../CONTEXT.md).
+This is the Inbox's database and its Edge Functions. Design: [`docs/spec/jot-v2.md`](../docs/spec/jot-v2.md) §3–§5. Vocabulary: [`CONTEXT.md`](../CONTEXT.md).
 
 - **Migrations:** `migrations/`. Tables, row-level security, the lifecycle functions, the `recordings` bucket and Realtime.
 - **Seed:** `seed.sql`. **Local only:** an Owner (`owner@jot.local`) and a processor agent (`claude@jot.local`, password `local-claude-password`).
-- **Tests:** `tests/database/`. pgTAP, one file per area.
+- **Functions:** `functions/`.
+  - `transcribe` turns a Recording into a parked Item.
+  - `health` is the keep-alive target.
+  - `_shared/transcriber/` is the Transcriber seam (ElevenLabs, plus a fake for tests).
+- **Tests:**
+  - `tests/database/`: pgTAP, one file per area.
+  - `tests/functions/`: Deno integration tests for the functions.
+  - The functions' unit tests sit next to their code (`*_test.ts`).
 
 ## Local development
 
@@ -28,8 +35,40 @@ supabase test db
 
 If your network blocks Docker Hub and ECR but allows GitHub's registry, prefix the commands with `SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io`.
 
+### Functions
+
+You also need [Deno](https://deno.com) 2.
+
+Unit tests (no stack needed):
+
+```bash
+(cd supabase/functions && deno test _shared/ transcribe/)
+```
+
+Integration tests run against the local stack, with the fake Transcriber (`tests/functions/test.env`). Start the stack and serve the functions:
+
+```bash
+supabase functions serve --env-file supabase/tests/functions/test.env
+```
+
+Then, in another terminal:
+
+```bash
+set -a; eval "$(supabase status -o env)"; set +a
+```
+
+```bash
+deno test --allow-net --allow-env --config supabase/functions/transcribe/deno.json supabase/tests/functions/
+```
+
+If the edge-runtime container can't fetch npm packages (for example behind an egress proxy), serve the functions on the host instead, then run the tests with `FUNCTIONS_URL=http://127.0.0.1:8787`. The command is in the header of `tests/functions/serve_local.ts`. That skips the platform's `verify_jwt` check, but the functions' own auth still runs.
+
+A live check of the real Transcriber: `supabase/functions/_shared/transcriber/try.ts` (instructions in its header).
+
 ## Rules worth knowing before you change anything
 
 - Nobody writes `items` directly. Clients change an Item only through `process_item`, `discard_item`, `restore_item` and `edit_item_text`. `transcribe` parks Items with the service role. New behaviour goes into a function, never into a policy that grants `update`.
 - A function's error message is a stable code (`not_allowed`, `not_found`, `wrong_state`, `invalid_text`). Clients match on it, so don't reword it.
 - Migrations are append-only once they've reached `v2` or `main`. Change things with a new migration.
+- Never log audio, Transcript text, tokens or keys from a function. Log error names and codes only.
+- The fake Transcriber refuses to load without `ALLOW_FAKE_TRANSCRIBER=1`. Never set that on the hosted project.

@@ -1,6 +1,7 @@
 -- Local development only: `supabase db reset` runs this. It never runs against the hosted project.
 --
---   Owner   owner@jot.local   signs in with the emailed code; read it in Mailpit (http://127.0.0.1:54324)
+--   Owner   owner@jot.local   signs in with the emailed code (read it in Mailpit, http://127.0.0.1:54324);
+--                             tests may also use the password local-owner-password
 --   Agent   claude@jot.local  password local-claude-password, role processor
 --
 -- Token columns are '' rather than NULL because GoTrue can't read NULLs there.
@@ -11,7 +12,7 @@ insert into auth.users (
   confirmation_token, recovery_token, email_change_token_new, email_change
 ) values
   ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-00000000000a', 'authenticated', 'authenticated',
-   'owner@jot.local', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
+   'owner@jot.local', extensions.crypt('local-owner-password', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-00000000000b', 'authenticated', 'authenticated',
    'claude@jot.local', extensions.crypt('local-claude-password', extensions.gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', '');
