@@ -87,7 +87,12 @@ for each row execute function public.items_guard();
 
 create table public.vocabulary (
   id bigint generated always as identity primary key,
-  term text not null check (char_length(term) between 1 and 50),
+  -- ElevenLabs' key-term rules: at most 50 characters and 5 words, none of < > { } [ ] \
+  term text not null check (
+    char_length(term) between 1 and 50
+    and array_length(regexp_split_to_array(term, '\s+'), 1) <= 5
+    and term !~ '[<>{}\[\]\\]'
+  ),
   created_at timestamptz not null default now()
 );
 
@@ -98,7 +103,7 @@ create function public.vocabulary_guard() returns trigger
 language plpgsql set search_path = ''
 as $$
 begin
-  new.term := btrim(new.term);
+  new.term := regexp_replace(btrim(new.term), '\s+', ' ', 'g');
   -- Serialise inserts so two at once can't both squeeze in at 99.
   perform pg_advisory_xact_lock(hashtext('public.vocabulary cap'));
   if (select count(*) from public.vocabulary) >= 100 then

@@ -102,7 +102,7 @@ Membership decides who may do what (ADR-0005, ADR-0011).
 | column | type | notes |
 |---|---|---|
 | `id` | bigint identity PK | |
-| `term` | text not null | Trimmed, 1–50 characters |
+| `term` | text not null | Trimmed, inner spaces collapsed; 1–50 characters, at most 5 words, none of `< > { } [ ] \` (ElevenLabs' key-term rules) |
 | `created_at` | timestamptz default now() | |
 
 - `term` is unique on `lower(term)`.
