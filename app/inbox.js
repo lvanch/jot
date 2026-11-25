@@ -7,7 +7,7 @@ export { SUPABASE_PUBLISHABLE_KEY };
 export const functionsUrl = (FUNCTIONS_URL || `${SUPABASE_URL}/functions/v1`).replace(/\/+$/, '');
 
 /** False until config.js holds the real project's values. */
-export const configured = !SUPABASE_URL.includes('YOUR-PROJECT-REF') && !SUPABASE_PUBLISHABLE_KEY.includes('REPLACE_ME');
+export const configured = !SUPABASE_URL.includes('your-project-ref') && !SUPABASE_PUBLISHABLE_KEY.includes('REPLACE_ME');
 
 export function createInbox() {
   return window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {

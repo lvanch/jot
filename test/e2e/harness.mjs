@@ -1,5 +1,5 @@
-// Shared set-up for Jot's end-to-end tests: serve app/ the way production will (same CSP, with the local
-// Supabase in connect-src), point config.js at the local stack, read sign-in codes from Mailpit, and fail
+// Shared set-up for Jot's end-to-end tests: serve app/ the way production will (its own CSP meta tag, with the
+// local Supabase in connect-src), point config.js at the local stack, read sign-in codes from Mailpit, and fail
 // on any CSP violation or console error.
 //
 // Needs the local stack (`supabase start`) and its values in the environment:
@@ -33,26 +33,26 @@ const TYPES = {
   '.md': 'text/plain; charset=utf-8',
 };
 
-/** Production's CSP (spec §6), with the local Supabase in place of the hosted one. */
-export function csp(apiUrl = API_URL) {
-  const ws = apiUrl.replace(/^http/, 'ws');
+/** Where production's Inbox is, from config.js: the host the CSP meta tag names. */
+const PROD_URL = (await readFile(join(APP_DIR, 'config.js'), 'utf8')).match(/SUPABASE_URL = '([^']+)'/)[1];
+
+/**
+ * index.html as production serves it, except that the CSP meta tag's connect-src names the local stack instead of
+ * the hosted project. Everything else in the policy is tested as written.
+ */
+export function localIndex(html) {
+  const meta = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/);
+  if (!meta) throw new Error('index.html has no CSP meta tag');
+  const host = new URL(PROD_URL).host;
+  const local = new URL(API_URL);
   const functionsOrigin = new URL(FUNCTIONS_URL).origin;
-  return [
-    "default-src 'self'",
-    "script-src 'self'",
-    "style-src 'self'",
-    "img-src 'self' data:",
-    "media-src 'self' blob:",
-    `connect-src 'self' ${apiUrl} ${ws}${functionsOrigin === new URL(apiUrl).origin ? '' : ` ${functionsOrigin}`}`,
-    "manifest-src 'self'",
-    "worker-src 'self'",
-    "object-src 'none'",
-    "base-uri 'none'",
-    "form-action 'none'",
-  ].join('; ');
+  const https = local.origin + (functionsOrigin === local.origin ? '' : ` ${functionsOrigin}`);
+  const policy = meta[1].replace(`https://${host}`, https).replace(`wss://${host}`, local.origin.replace(/^http/, 'ws'));
+  if (policy === meta[1]) throw new Error(`the CSP's connect-src doesn't name ${host} from config.js`);
+  return html.replace(meta[1], policy);
 }
 
-/** Serves app/ on 127.0.0.1 with the CSP header, and a config.js pointing at the local stack. */
+/** Serves app/ on 127.0.0.1 with its CSP meta tag pointed at the local stack, and a config.js to match. */
 export async function serveApp() {
   if (!PUBLISHABLE_KEY) throw new Error('PUBLISHABLE_KEY is not set: run  set -a; eval "$(supabase status -o env)"; set +a');
   const config = `export const SUPABASE_URL = ${JSON.stringify(API_URL)};\n` +
@@ -62,7 +62,6 @@ export async function serveApp() {
     const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     const rel = path.endsWith('/') ? path + 'index.html' : path;
     const file = normalize(join(APP_DIR, rel));
-    res.setHeader('Content-Security-Policy', csp());
     res.setHeader('Cache-Control', 'no-store');
     if (!file.startsWith(APP_DIR.endsWith(sep) ? APP_DIR : APP_DIR + sep)) {
       res.writeHead(403).end();
@@ -73,7 +72,8 @@ export async function serveApp() {
       return;
     }
     try {
-      const body = await readFile(file);
+      let body = await readFile(file);
+      if (rel === '/index.html') body = localIndex(body.toString('utf8'));
       res.writeHead(200, { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream' }).end(body);
     } catch {
       res.writeHead(404).end('not found');

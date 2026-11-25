@@ -203,28 +203,14 @@ t("bad requests are 400 and oversized ones 413", async () => {
   assertEquals([big.status, big.body.error], [413, "too_large"]);
 });
 
-t("other methods are refused, and browsers get CORS only from Jot's origin", async () => {
+t("other methods are refused", async () => {
   const get = await fetch(`${FUNCTIONS}/transcribe`, { headers: { Authorization: `Bearer ${(await setup).owner}` } });
   await get.body?.cancel();
   assertEquals(get.status, 405);
-
-  const preflight = (origin: string) =>
-    fetch(`${FUNCTIONS}/transcribe`, {
-      method: "OPTIONS",
-      headers: {
-        Origin: origin,
-        "Access-Control-Request-Method": "POST",
-        "Access-Control-Request-Headers": "authorization",
-      },
-    });
-  const jot = await preflight("https://lvanch.github.io");
-  await jot.body?.cancel();
-  assert(jot.status < 300, `preflight status ${jot.status}`);
-  assertEquals(jot.headers.get("access-control-allow-origin"), "https://lvanch.github.io");
-  const other = await preflight("https://evil.example");
-  await other.body?.cancel();
-  assertEquals(other.headers.get("access-control-allow-origin"), null);
 });
+
+// CORS for transcribe is checked in cors_test.ts, against the functions served directly: the local gateway answers
+// preflights itself.
 
 // ---------- health ----------
 

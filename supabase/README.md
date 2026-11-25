@@ -63,6 +63,8 @@ deno test --allow-net --allow-env --config supabase/functions/transcribe/deno.js
 
 If the edge-runtime container can't fetch npm packages (for example behind an egress proxy), serve the functions on the host instead, then run the tests with `FUNCTIONS_URL=http://127.0.0.1:8787`. The command is in the header of `tests/functions/serve_local.ts`. That skips the platform's `verify_jwt` check, but the functions' own auth still runs.
 
+`tests/functions/cors_test.ts` only runs against the functions served on the host. Through the local gateway it's reported as ignored, because Kong's cors plugin answers every preflight itself with `*`. The hosted platform passes preflights to the function, so the function's own CORS is what browsers get in production. CI runs it both ways.
+
 A live check of the real Transcriber: `supabase/functions/_shared/transcriber/try.ts` (instructions in its header).
 
 ## Rules worth knowing before you change anything

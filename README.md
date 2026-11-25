@@ -12,3 +12,5 @@ process. Terms in bold are defined in [`CONTEXT.md`](CONTEXT.md).
 - [`docs/spec/jot-v2.md`](docs/spec/jot-v2.md): the build spec. [`docs/adr/`](docs/adr/): why it's built this way.
 - [`test/`](test/): unit tests (`npm run test:unit`) and end-to-end tests against the local stack
   (`npm run test:e2e`).
+- [`.github/workflows/`](.github/workflows/): CI on every push (`ci.yml`). Deploys (`deploy.yml`): the backend from
+  `v2` and `main`, and Jot to GitHub Pages from `main`.

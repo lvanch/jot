@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <!-- CSP (ADR-0013): GitHub Pages can't send headers, so it's here, before anything it governs. connect-src names
+       the Supabase project host, which must match SUPABASE_URL in config.js (test/unit/csp.test.mjs checks). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self' https://your-project-ref.supabase.co wss://your-project-ref.supabase.co; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Jot</title>
   <meta name="description" content="Say it, it's in your Inbox. One-tap voice capture for your to-do Inbox.">
