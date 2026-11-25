@@ -13,7 +13,7 @@ All of these must be true:
   - the email template shows the code.
 - **The real project is in the app:** `app/config.js` and the CSP tag in `app/index.html` hold the project ref and publishable key. The agent does this once you've sent them.
 - **CI is green on `v2`.**
-- **v1's address is known.** This runbook assumes the installed Jot opens `https://lvanch.github.io/jot/app/`, which is GitHub Pages serving `main` from the branch. If it opens anywhere else, **stop and tell the agent.** Browser storage belongs to one origin, so v2 on `lvanch.github.io` can only import a v1 list stored on `lvanch.github.io`.
+- **v1's address.** Confirmed 2026-11-25: the installed Jot opens `https://lvanch.github.io/jot/app/`, which is GitHub Pages serving `main` from the branch. That's the same origin as v2, so the import can read v1's list. The address itself changes to `/jot/`, so the phone needs the new Jot added to the home screen (step 5).
 
 ## What happens to the old address
 
