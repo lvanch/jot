@@ -2,9 +2,10 @@
 // security is what protects the data (ADR-0005).
 //
 // Set both once the Supabase project exists (owner setup, #2): Dashboard → Project Settings → API Keys.
-// The project host must also be in the CSP's connect-src (index.html, #6).
+// The project host lives in one other place: the CSP meta tag's connect-src in index.html, as https:// and wss://.
+// Change both together; test/unit/csp.test.mjs fails if they differ, and the Pages deploy refuses the placeholder.
 
-export const SUPABASE_URL = 'https://YOUR-PROJECT-REF.supabase.co';
+export const SUPABASE_URL = 'https://your-project-ref.supabase.co';
 export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_REPLACE_ME';
 
 // Optional: where the Edge Functions live, if not at SUPABASE_URL/functions/v1. Only local test setups need it.

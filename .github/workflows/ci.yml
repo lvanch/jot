@@ -1,0 +1,90 @@
+# Tests (spec §8): Jot's pure modules, the database (pgTAP), the Edge Functions (Deno), and end-to-end tests in
+# Chromium against a local Supabase stack with the fake Transcriber.
+#
+# It runs on every push, so a pull request shows the checks of its head commit. A pull request from a fork has no
+# push here, so it gets its own run.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:unit
+
+  inbox:
+    name: Database, functions and end-to-end
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 3.3.0
+      - uses: denoland/setup-deno@v2.0.5
+        with:
+          deno-version: 2.9.8
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Start local Supabase
+        run: supabase start -x studio,imgproxy,logflare,vector,supavisor,postgres-meta
+      - name: Export the local stack's settings
+        # API_URL, PUBLISHABLE_KEY, SECRET_KEY, FUNCTIONS_URL, MAILPIT_URL…: what the tests read.
+        run: supabase status -o env | sed -E 's/^([A-Z0-9_]+)="(.*)"$/\1=\2/' >> "$GITHUB_ENV"
+
+      - name: Database tests (pgTAP)
+        run: supabase test db
+
+      - name: Function unit tests
+        working-directory: supabase/functions
+        run: deno test _shared/ transcribe/
+
+      - name: Serve the functions with the fake Transcriber
+        # Through the real edge runtime and gateway, so the platform's verify_jwt check is part of the test.
+        run: |
+          nohup supabase functions serve --env-file supabase/tests/functions/test.env > functions.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf "$FUNCTIONS_URL/health"; then exit 0; fi
+            sleep 2
+          done
+          cat functions.log
+          exit 1
+
+      - name: Function integration tests
+        run: deno test --allow-net --allow-env --config supabase/functions/transcribe/deno.json supabase/tests/functions/
+
+      - name: End-to-end tests
+        # Chromium with a fake microphone playing test/fixtures/speech.wav (see test/e2e/harness.mjs). These drive the
+        # Playwright library from node:test, which records no traces.
+        run: npm run test:e2e
+
+      - name: Function logs
+        if: failure()
+        run: cat functions.log || true

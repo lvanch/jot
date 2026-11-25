@@ -396,13 +396,17 @@ Two modules handle this: `recent.js` (pure, unit-tested) and `strip.js` (the UI)
 
 ### Hosting and offline
 
-**CSP meta tag** (ADR-0013):
+**CSP meta tag** (ADR-0013), first thing in `index.html`'s `<head>` (#6):
 
 ```
 default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:;
 connect-src 'self' https://<ref>.supabase.co wss://<ref>.supabase.co; manifest-src 'self';
 worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
 ```
+
+- The project host appears in two places: `SUPABASE_URL` in `app/config.js`, and `connect-src` here (as `https://` and `wss://`). Change them together. `test/unit/csp.test.mjs` fails if they differ, if the tag isn't ahead of every script and stylesheet, or if it drifts from the policy above.
+- The end-to-end harness serves `index.html` as written, swapping only the `connect-src` host for the local stack, so every e2e test runs under the real policy. `test/e2e/csp.test.mjs` checks that it blocks an inline script and a connection to another host.
+- A meta-tag CSP can't set `frame-ancestors`; that protection is dropped (ADR-0013).
 
 **Service worker.** Precache the shell, including the module files and the vendored supabase-js. Bump `CACHE`. Never cache Supabase requests.
 
@@ -435,15 +439,15 @@ worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
 
 ## 8. Deploy, CI and operations
 
-**`.github/workflows/deploy.yml`**
-- **`pages` job:** runs on a push to `main` only. It does `actions/upload-pages-artifact` from `app/`, then `actions/deploy-pages`. The repo's Pages source is set to "GitHub Actions".
-- **`backend` job:** runs on a push to `v2` or `main`. It runs `supabase link --project-ref $SUPABASE_PROJECT_REF`, `supabase db push` and `supabase functions deploy`. It uses the repo secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`, plus the repo variable `SUPABASE_PROJECT_REF`.
+**`.github/workflows/deploy.yml`** (#6), on a push to `v2` or `main`. One deploy runs at a time, in order, and is never cancelled.
+- **`backend` job:** `supabase link --project-ref $SUPABASE_PROJECT_REF`, `supabase db push --remote --yes`, then `supabase functions deploy --yes` (CLI 3.x: `db push` targets the local database unless told `--remote`). It uses the repo secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` and the repo variable `SUPABASE_PROJECT_REF`. Until owner setup sets that variable, the job is skipped on `v2`; on `main` it fails instead. `verify_jwt` per function comes from `config.toml`; function secrets are set in the dashboard.
+- **`pages` job:** on `main` only, after `backend`. It refuses to publish while `app/config.js` or the CSP still holds the placeholder project, then runs `actions/upload-pages-artifact` from `app/` and `actions/deploy-pages`. The repo's Pages source is set to "GitHub Actions".
 
-**`.github/workflows/ci.yml`** runs on pull requests and pushes. It runs:
-- `node --test` for the client's pure modules;
+**`.github/workflows/ci.yml`** (#6) runs on every push, so a pull request shows the checks of its head commit; a pull request from a fork gets its own run. It runs:
+- `node --test` for the client's pure modules, including the CSP checks;
 - `supabase start` followed by `supabase test db` (pgTAP) for RLS and the lifecycle;
-- Deno tests for the functions, using the fake Transcriber;
-- Playwright end-to-end tests, with Chromium's fake mic (`--use-fake-device-for-media-stream --use-file-for-fake-audio-capture=<wav>`), against local Supabase and the fake Transcriber.
+- Deno tests for the functions: the unit tests, then the integration tests against `supabase functions serve` with the fake Transcriber, so the platform's `verify_jwt` is in the path;
+- Playwright end-to-end tests, with Chromium's fake mic (`--use-fake-device-for-media-stream --use-file-for-fake-audio-capture=<wav>`), against the same local stack. They drive the Playwright library from `node:test`, which records no traces.
 
 **Keep-alive (ADR-0012).** A cron-job.org job calls `GET https://<ref>.supabase.co/functions/v1/health` every 2 days and emails on failure.
 

@@ -7,3 +7,7 @@ Jot lives in `app/`. Without a workflow, GitHub Pages can only serve a branch's 
 - Jot will be served at `https://lvanch.github.io/jot/`. If the installed app currently opens a different path, re-add it to the home screen and re-point the power-button shortcut. v1 data still imports, because browser storage belongs to the `lvanch.github.io` origin.
 - A meta-tag CSP can't set `frame-ancestors`, so that protection is dropped.
 - `docs/` is never published, because Pages serves only what the workflow uploads.
+
+## Update (2026-11-25)
+
+While v2 is being built, the backend also deploys on every push to the `v2` integration branch, so it can be tested against the real project before cut-over (spec §9). Jot itself still only goes to Pages from `main`.
