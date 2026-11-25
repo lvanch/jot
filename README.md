@@ -9,6 +9,7 @@ process. Terms in bold are defined in [`CONTEXT.md`](CONTEXT.md).
   [README](supabase/README.md).
 - [`docs/inbox-contract.md`](docs/inbox-contract.md): **for anything that reads or processes the Inbox.** Fields,
   states, permissions, examples, and the runbooks for adding and revoking processor agents.
+- [`docs/owner-setup.md`](docs/owner-setup.md): setting up the Supabase project, ElevenLabs, GitHub and the keep-alive.
 - [`docs/spec/jot-v2.md`](docs/spec/jot-v2.md): the build spec. [`docs/adr/`](docs/adr/): why it's built this way.
 - [`test/`](test/): unit tests (`npm run test:unit`) and end-to-end tests against the local stack
   (`npm run test:e2e`).

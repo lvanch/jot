@@ -451,7 +451,7 @@ worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
 
 **Keep-alive (ADR-0012).** A cron-job.org job calls `GET https://<ref>.supabase.co/functions/v1/health` every 2 days and emails on failure.
 
-**Owner-only setup.** This is done by hand and tracked in its own ticket:
+**Owner-only setup.** This is done by hand and tracked in its own ticket (#2); the step-by-step is [`docs/owner-setup.md`](../owner-setup.md):
 - the Supabase project (Sydney), with sign-ups disabled and the email template showing `{{ .Token }}`;
 - the owner user and its `members` row;
 - an ElevenLabs account and key on prepaid credit with no overage billing, plus a low-balance alert;
