@@ -139,7 +139,7 @@ These are callable from any client through `supabase.rpc(...)` and are the only 
 - Each returns the updated Item row.
 - **Errors:** each raises a Postgres exception whose message is a stable code. The SQLSTATE picks the REST status:
   - `not_allowed`: `42501` (403)
-  - `not_found`: `P0002` (404)
+  - `not_found`: `PT404` (404; PostgREST turns SQLSTATE `PTxyz` into HTTP `xyz`)
   - `wrong_state`: `P0001` (400)
   - `invalid_text`: `22023` (400)
   - `invalid_rows`: `22023` (400; `import_v1_items` only)

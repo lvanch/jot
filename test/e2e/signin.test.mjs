@@ -2,17 +2,21 @@
 
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { clearMail, latestCode, openJot, serveApp } from './harness.mjs';
+import { clearMail, latestCode, openJot, removeItems, serveApp } from './harness.mjs';
 
 const OWNER = 'owner@jot.local'; // from supabase/seed.sql
 // Another seeded user. Auth limits how often one address gets a code, so the wrong-code test uses this one.
 const OTHER = 'claude@jot.local';
+// A v1 list on the device. Signing in imports it (#12), so the test removes the Item afterwards.
+const V1_TASK_ID = `signin-${Date.now().toString(36)}`;
+const V1_LIST = JSON.stringify([{ id: V1_TASK_ID, text: 'v1 task', createdAt: 1 }]);
 
 let app;
 before(async () => {
   app = await serveApp();
 });
 after(async () => {
+  await removeItems([V1_TASK_ID]).catch(() => {});
   await app?.close();
 });
 
@@ -70,7 +74,7 @@ test('a malformed email never reaches the server', async () => {
 test('the emailed code signs in; a reload stays signed in; sign out returns to the card', async () => {
   await clearMail();
   await withJot({}, async ({ page }) => {
-    await page.evaluate(() => localStorage.setItem('jot.tasks.v1', '[{"id":"a","text":"v1 task","createdAt":1}]'));
+    await page.evaluate((list) => localStorage.setItem('jot.tasks.v1', list), V1_LIST);
     await signIn(page);
     assert.equal(await page.isVisible('#signin'), false);
 
@@ -86,7 +90,7 @@ test('the emailed code signs in; a reload stays signed in; sign out returns to t
     assert.equal(await page.inputValue('#email'), OWNER, 'the email is remembered');
 
     // v1's list is left alone for the import (#12).
-    assert.equal(await page.evaluate(() => localStorage.getItem('jot.tasks.v1')), '[{"id":"a","text":"v1 task","createdAt":1}]');
+    assert.equal(await page.evaluate(() => localStorage.getItem('jot.tasks.v1')), V1_LIST);
   });
 });
 
