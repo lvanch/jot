@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 
-const APP_DIR = fileURLToPath(new URL('../../app/', import.meta.url));
+export const APP_DIR = fileURLToPath(new URL('../../app/', import.meta.url));
 export const API_URL = process.env.API_URL ?? 'http://127.0.0.1:54321';
 // Where the Edge Functions answer. Through the gateway by default; set it when they're served on the host
 // instead (supabase/tests/functions/serve_local.ts).
@@ -23,7 +23,7 @@ export const FUNCTIONS_URL = process.env.FUNCTIONS_URL ?? `${API_URL}/functions/
 const PUBLISHABLE_KEY = process.env.PUBLISHABLE_KEY;
 const MAILPIT_URL = process.env.MAILPIT_URL ?? 'http://127.0.0.1:54324';
 
-const TYPES = {
+export const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -52,12 +52,18 @@ export function localIndex(html) {
   return html.replace(meta[1], policy);
 }
 
+/** config.js pointing at the local stack. */
+export function configJs() {
+  if (!PUBLISHABLE_KEY) throw new Error('PUBLISHABLE_KEY is not set: run  set -a; eval "$(supabase status -o env)"; set +a');
+  return `export const SUPABASE_URL = ${JSON.stringify(API_URL)};\n` +
+    `export const SUPABASE_PUBLISHABLE_KEY = ${JSON.stringify(PUBLISHABLE_KEY)};\n` +
+    `export const FUNCTIONS_URL = ${JSON.stringify(FUNCTIONS_URL)};\n`;
+}
+
 /** Serves app/ on 127.0.0.1 with its CSP meta tag pointed at the local stack, and a config.js to match. */
 export async function serveApp() {
   if (!PUBLISHABLE_KEY) throw new Error('PUBLISHABLE_KEY is not set: run  set -a; eval "$(supabase status -o env)"; set +a');
-  const config = `export const SUPABASE_URL = ${JSON.stringify(API_URL)};\n` +
-    `export const SUPABASE_PUBLISHABLE_KEY = ${JSON.stringify(PUBLISHABLE_KEY)};\n` +
-    `export const FUNCTIONS_URL = ${JSON.stringify(FUNCTIONS_URL)};\n`;
+  const config = configJs();
   const server = createServer(async (req, res) => {
     const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     const rel = path.endsWith('/') ? path + 'index.html' : path;

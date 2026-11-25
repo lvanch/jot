@@ -12,3 +12,4 @@
 
   The audio is machine-generated, so there's no recording of a real person in the repo.
 - Silent audio is generated on the fly by `test/e2e/harness.mjs` (`silentWav()`).
+- `v1/` stands in for Jot v1 at its old address, for the cut-over test (`test/e2e/cutover.test.mjs`). `sw.js` and `manifest.webmanifest` are v1's own files, copied from `main` before cut-over. `index.html`, `app.js` and `styles.css` are stubs that only register that service worker.

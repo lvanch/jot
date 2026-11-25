@@ -616,3 +616,22 @@ body[data-screen="vocabulary"] .fab { display: none; }
   .mic.is-listening::after { animation: none; }
   .mic.is-listening { box-shadow: 0 0 0 14px var(--accent-soft); }
 }
+
+/* v1's old address: "Jot has moved" (app/app/index.html, #14) */
+
+.moved {
+  max-width: 480px;
+  padding-top: 48px;
+}
+
+.moved h1 { margin: 0 0 12px; font-size: 1.5rem; }
+.moved p { margin: 0 0 20px; }
+.moved a { color: inherit; }
+
+.moved .primary {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 20px;
+  padding: 0 20px;
+  text-decoration: none;
+}

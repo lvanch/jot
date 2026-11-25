@@ -408,7 +408,7 @@ worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
 - The end-to-end harness serves `index.html` as written, swapping only the `connect-src` host for the local stack, so every e2e test runs under the real policy. `test/e2e/csp.test.mjs` checks that it blocks an inline script and a connection to another host.
 - A meta-tag CSP can't set `frame-ancestors`; that protection is dropped (ADR-0013).
 
-**Service worker.** Precache the shell, including the module files and the vendored supabase-js. Bump `CACHE`. Never cache Supabase requests.
+**Service worker.** Precache the shell, including the module files and the vendored supabase-js. Bump `CACHE`. Never cache Supabase requests. Offline, only navigations to pages in Jot's own directory get the cached shell. Anything in a subdirectory, such as v1's old address `app/`, goes to the network, because the shell's relative URLs would break there (#14).
 
 **Manifest.** Keep the relative `start_url` and `scope`, so the app works under `/jot/`. Update `description`, which still says Jot "stays on your phone".
 
@@ -465,7 +465,8 @@ worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
 
 - **Branch.** All v2 work lands on an integration branch, `v2`, cut from `main` once the design docs are merged. Pull requests target `v2`. The phone keeps running v1 until cut-over.
 - **Backend.** The backend deploys from `v2` as it lands, so it can be tested against the real project before cut-over.
-- **Cut-over.** Merge `v2` into `main`, switch Pages to "GitHub Actions", re-add Jot to the home screen if its URL changed, and run §10 on the phone.
+- **Cut-over.** Switch Pages to "GitHub Actions", merge `v2` into `main`, re-add Jot to the home screen if its URL changed, and run §10 on the phone. Step by step: [`docs/cut-over.md`](../cut-over.md).
+- **v1's old address.** v1 was served from `/jot/app/`. After cut-over, `app/app/` puts a "Jot has moved" page there, plus a service worker that replaces v1's. The replacement removes itself so the old shortcut stops serving v1 from its cache, and it leaves storage alone for the import. `test/e2e/cutover.test.mjs` rehearses the switch.
 - **Rollback.** Revert the merge. v1 data is safe, because the import leaves v1 storage alone for 30 days.
 
 ## 10. Acceptance (whole build)
