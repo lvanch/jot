@@ -5,8 +5,8 @@
 // The project host lives in one other place: the CSP meta tag's connect-src in index.html, as https:// and wss://.
 // Change both together; test/unit/csp.test.mjs fails if they differ, and the Pages deploy refuses the placeholder.
 
-export const SUPABASE_URL = 'https://your-project-ref.supabase.co';
-export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_REPLACE_ME';
+export const SUPABASE_URL = 'https://hidnrdanbmfiflzvsyif.supabase.co';
+export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_kzfA2N_-ot-RObxZ6dImhg_wpk-KXOr';
 
 // Optional: where the Edge Functions live, if not at SUPABASE_URL/functions/v1. Only local test setups need it.
 export const FUNCTIONS_URL = '';

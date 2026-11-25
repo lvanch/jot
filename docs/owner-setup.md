@@ -72,7 +72,7 @@ Run it once by hand. The response should be `{"ok":true}`.
 Send these as a comment on #2 or in chat:
 
 - **Your starting Vocabulary:** the names, places and jargon Jot gets wrong. Up to 100 terms, each at most 50 characters and 5 words. The agent loads them with one SQL statement, or you can type them into Jot's Vocabulary screen later.
-- **The URL your installed Jot opens today**, from Chrome's ⋮ → App info, or by opening it in a tab. If it isn't `https://lvanch.github.io/jot/`, you'll re-add Jot to the home screen at cut-over and re-point the power-button shortcut. v1's list still imports, because it belongs to the `lvanch.github.io` origin.
+- ~~The URL your installed Jot opens today.~~ Done: `https://lvanch.github.io/jot/app/`. At cut-over you'll re-add Jot from `/jot/` and re-point the power-button shortcut. v1's list still imports, because it's on the same `lvanch.github.io` origin (`docs/cut-over.md`).
 
 ## Then
 
