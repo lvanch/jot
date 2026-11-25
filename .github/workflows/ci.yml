@@ -53,8 +53,12 @@ jobs:
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium
 
-      - name: Start local Supabase
-        run: supabase start -x studio,imgproxy,logflare,vector,supavisor,postgres-meta
+      - name: Start local Supabase, without its default grants
+        # A new hosted project doesn't grant new tables to the API roles; the local stack does. Dropping those defaults
+        # first means the tests only pass if the migrations grant what they need.
+        run: |
+          cp supabase/ci/no_default_grants.sql supabase/migrations/20261123000000_ci_no_default_grants.sql
+          supabase start -x studio,imgproxy,logflare,vector,supavisor,postgres-meta
       - name: Export the local stack's settings
         # API_URL, PUBLISHABLE_KEY, SECRET_KEY, FUNCTIONS_URL, MAILPIT_URL…: what the tests read.
         run: supabase status -o env | sed -E 's/^([A-Z0-9_]+)="(.*)"$/\1=\2/' >> "$GITHUB_ENV"

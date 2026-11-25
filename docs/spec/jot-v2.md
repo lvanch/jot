@@ -130,6 +130,7 @@ One row per call to the Transcriber. This drives the daily cap and gives cost vi
 | `members` | select own row | select own row | none |
 
 - Nobody gets direct `insert`, `update` or `delete` on `items`. Every change goes through the functions in §4, or through the service role inside `transcribe`.
+- **Grants are explicit** (migration `20261126000000_explicit_grants.sql`). `authenticated` gets the table privileges above, and RLS picks the rows; `service_role` gets select/insert/update/delete on the four tables for the functions. Nothing relies on Supabase's default privileges, which the local stack has and a new hosted project doesn't (found at the first deploy, #2). CI runs without those defaults.
 
 ## 4. Lifecycle functions (RPC)
 

@@ -70,6 +70,7 @@ A live check of the real Transcriber: `supabase/functions/_shared/transcriber/tr
 ## Rules worth knowing before you change anything
 
 - Nobody writes `items` directly. Clients change an Item only through `process_item`, `discard_item`, `restore_item` and `edit_item_text`. `transcribe` parks Items with the service role. New behaviour goes into a function, never into a policy that grants `update`.
+- Grant table privileges explicitly in the migration that creates a table. A new hosted project doesn't grant new tables to `authenticated` or `service_role` the way the local stack does. CI starts the stack without those defaults (`ci/no_default_grants.sql`), so a missing grant fails the tests.
 - A function's error message is a stable code (`not_allowed`, `not_found`, `wrong_state`, `invalid_text`). Clients match on it, so don't reword it.
 - Migrations are append-only once they've reached `v2` or `main`. Change things with a new migration.
 - Never log audio, Transcript text, tokens or keys from a function. Log error names and codes only.
