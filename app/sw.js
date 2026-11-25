@@ -1,7 +1,7 @@
 'use strict';
 
 // Bump on every deploy so clients pick up the new shell.
-const CACHE = 'jot-v10';
+const CACHE = 'jot-v11';
 
 const SHELL = [
   './', // not 'index.html': some hosts redirect it to './'
@@ -48,6 +48,14 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Only Jot's own pages get the cached shell when offline. The shell's relative URLs only work in Jot's own
+// directory, so a page in a subdirectory, such as v1's old address app/ (#14), always comes from the network.
+function isAppPage(url) {
+  const path = new URL(url).pathname;
+  const scope = new URL(self.registration.scope).pathname;
+  return path.startsWith(scope) && !path.slice(scope.length).includes('/');
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   // Cross-origin requests (Supabase: auth, the Inbox, transcribe) and writes always go to the network.
@@ -56,7 +64,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(req, { ignoreSearch: true }).then((hit) => {
       if (hit) return hit;
-      if (req.mode === 'navigate') {
+      if (req.mode === 'navigate' && isAppPage(req.url)) {
         return caches.match('./').then((shell) => shell || fetch(req));
       }
       return fetch(req);
