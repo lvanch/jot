@@ -446,7 +446,7 @@ worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
 **`.github/workflows/ci.yml`** (#6) runs on every push, so a pull request shows the checks of its head commit; a pull request from a fork gets its own run. It runs:
 - `node --test` for the client's pure modules, including the CSP checks;
 - `supabase start` followed by `supabase test db` (pgTAP) for RLS and the lifecycle;
-- Deno tests for the functions: the unit tests, then the integration tests against `supabase functions serve` with the fake Transcriber, so the platform's `verify_jwt` is in the path;
+- Deno tests for the functions: the unit tests, then the integration tests against `supabase functions serve` with the fake Transcriber, so the platform's `verify_jwt` is in the path. CORS is then checked against the functions run on the host (`serve_local.ts`), because the local gateway answers preflights itself with `*` while the hosted platform passes them to the function;
 - Playwright end-to-end tests, with Chromium's fake mic (`--use-fake-device-for-media-stream --use-file-for-fake-audio-capture=<wav>`), against the same local stack. They drive the Playwright library from `node:test`, which records no traces.
 
 **Keep-alive (ADR-0012).** A cron-job.org job calls `GET https://<ref>.supabase.co/functions/v1/health` every 2 days and emails on failure.
