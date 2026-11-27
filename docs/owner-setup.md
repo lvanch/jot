@@ -7,7 +7,7 @@ The steps only the **Owner** can do, because they need your accounts: the Supaba
 
 ## 1. Create the Supabase project
 
-1. Sign in to [supabase.com](https://supabase.com/dashboard) **with the email you'll sign in to Jot with**. Until a custom email server is set up, Supabase's built-in email only sends sign-in codes to members of the project's organization, and at most **2 emails an hour**.
+1. Sign in to [supabase.com](https://supabase.com/dashboard) **with the email you'll sign in to Jot with**. Until custom SMTP is set up (step 3), Supabase's built-in email only sends sign-in codes to members of the project's organization, and at most **2 emails an hour**.
 2. **New project:** Free plan, region **Sydney (`ap-southeast-2`)**, name `jot`. Let it generate the database password, and save that password in your password manager.
 3. Copy two values and send them to the agent:
    - the **project ref**: Project Settings → General (it's also the subdomain in `https://<ref>.supabase.co`);
@@ -30,7 +30,12 @@ Leave Settings → Pages alone until cut-over (#14).
 In the Supabase dashboard, under Authentication:
 
 1. **Sign In / Providers:** turn **off** "Allow new users to sign up". Under Email, leave it enabled, with the OTP length at 6 and expiry at 3600 s.
-2. **Emails → Templates → Magic Link:**
+2. **Emails → SMTP Settings:** turn on custom SMTP. Supabase only lets you edit the email templates with your own SMTP. The default Magic Link email holds a link and no code, and a link would open in Chrome rather than the installed Jot. Custom SMTP also lifts the built-in limits (2 an hour, team members only). Jot only emails you, so your own Gmail works:
+   - **Gmail app password:** at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) (2-Step Verification must be on), create one named `Supabase Jot`. Enter its 16 letters without the spaces.
+   - **Sender email:** your Gmail address. **Sender name:** `Jot`.
+   - **Host:** `smtp.gmail.com`, **port** `587`, **username** your Gmail address, **password** the app password.
+   - Another provider works too, for example Resend: host `smtp.resend.com`, port `465`, username `resend`, password a Resend API key.
+3. **Emails → Templates → Magic Link:**
    - **Subject:** `Your Jot sign-in code`
    - **Body:** paste the following. It's the same as `supabase/templates/magic_link.html`.
 
@@ -41,15 +46,15 @@ In the Supabase dashboard, under Authentication:
      <p>If you didn't ask for it, ignore this email.</p>
      ```
 
-3. **Users → Add user → Create new user:** your email, any long random password (you won't use it), and tick **Auto Confirm User**.
-4. **After step 2's deploy has run**, open the SQL Editor and make yourself the Owner, with your email in place of the example:
+4. **Users → Add user → Create new user:** your email, any long random password (you won't use it), and tick **Auto Confirm User**.
+5. **After step 2's deploy has run**, open the SQL Editor and make yourself the Owner, with your email in place of the example:
 
    ```sql
    insert into public.members (user_id, role, name)
    select id, 'owner', 'owner' from auth.users where email = 'you@example.com';
    ```
 
-   It should say `INSERT 0 1`. If it says `INSERT 0 0`, the email doesn't match the user from item 3.
+   It should say `INSERT 0 1`. If it says `INSERT 0 0`, the email doesn't match the user from item 4.
 
 ## 4. ElevenLabs
 
